@@ -117,6 +117,8 @@
       }
       .nav { display: flex; gap: 26px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
       .nav span { cursor: default; }
+      .nav a { color: var(--ember-deep); text-decoration: none; transition: color 0.15s; }
+      .nav a:hover { color: var(--ember); }
 
       /* hero */
       .hero { padding: 78px 0 54px; max-width: 760px; }
@@ -254,7 +256,7 @@
     <div class="wrap">
       <header class="reveal d1">
         <div class="brand"><span class="mark"></span>Northward Outfitters</div>
-        <nav class="nav"><span>Field Guide</span><span>Catalogue</span><span>Stockists</span></nav>
+        <nav class="nav"><span>Field Guide</span><span>Catalogue</span><a href="/docs">Install</a></nav>
       </header>
 
       <section class="hero">

@@ -24,4 +24,6 @@ export interface AppDeps {
   loaderBundle?: { js: string; map: string | null };
   /** Example storefront HTML to serve at /demo; omitted in tests/when absent. */
   demoHtml?: string;
+  /** Install/embed docs HTML to serve at /docs; omitted in tests/when absent. */
+  docsHtml?: string;
 }

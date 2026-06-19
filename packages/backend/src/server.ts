@@ -34,10 +34,10 @@ function readLoaderBundle(): { js: string; map: string | null } | undefined {
   };
 }
 
-/** Read the example storefront HTML (sibling package) to serve at /demo. */
-function readDemoHtml(): string | undefined {
+/** Read a sibling example HTML file (host.html / docs.html) to serve statically. */
+function readExampleHtml(file: string): string | undefined {
   const here = dirname(fileURLToPath(import.meta.url));
-  const path = resolve(here, "../../loader/examples/host.html");
+  const path = resolve(here, "../../loader/examples", file);
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
 }
 
@@ -64,7 +64,8 @@ const app = createApp({
   utmSource: env.ATTRIBUTION_UTM_SOURCE,
   sessionIpRateLimitPerMin: 30,
   loaderBundle: readLoaderBundle(),
-  demoHtml: readDemoHtml(),
+  demoHtml: readExampleHtml("host.html"),
+  docsHtml: readExampleHtml("docs.html"),
 });
 
 // Bind 0.0.0.0 so the platform (Railway) can route to the container; PORT is

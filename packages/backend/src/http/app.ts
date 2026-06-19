@@ -63,6 +63,14 @@ export function createApp(deps: AppDeps): Hono {
     });
   }
 
+  if (deps.docsHtml) {
+    const html = deps.docsHtml;
+    app.get("/docs", (c) => {
+      c.header("content-type", "text/html; charset=utf-8");
+      return c.body(html);
+    });
+  }
+
   return app;
 }
 

@@ -55,4 +55,12 @@ describe("hosted demo", () => {
     const { app } = buildApp();
     expect((await app.request("/demo")).status).toBe(404);
   });
+
+  it("serves /docs as HTML when configured", async () => {
+    const { app } = buildApp({ docsHtml: "<!doctype html><title>install</title>" });
+    const res = await app.request("/docs");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(await res.text()).toContain("install");
+  });
 });
