@@ -98,6 +98,15 @@ export function boot(deps: BootDeps): void {
         widget: deps.widget,
         cart: deps.cart,
         checkout: deps.checkout,
+        // TEMP wiring beacon — reports client-tool payloads to the backend.
+        report: (name, args) => {
+          void (deps.fetchImpl ?? fetch)(`${deps.apiBase}/v1/debug/tool-capture`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({ name, args }),
+          }).catch(() => undefined);
+        },
       });
     } catch {
       deps.widget.setStatus("error");
