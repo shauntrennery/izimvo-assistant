@@ -46,6 +46,15 @@ describe("registerClientTools", () => {
     expect(widget.showCards).toHaveBeenCalledWith([product]);
   });
 
+  it("render_products parses a JSON-encoded items string (Speechify scalar param)", () => {
+    const { handle, call } = fakeHandle();
+    const widget = fakeWidget();
+    registerClientTools(handle, { widget, cart: createCart(), checkout: noopCheckout() });
+
+    call("render_products", { items: JSON.stringify([product]) });
+    expect(widget.showCards).toHaveBeenCalledWith([product]);
+  });
+
   it("update_cart updates quantities", () => {
     const { handle, call } = fakeHandle();
     const cart = createCart();

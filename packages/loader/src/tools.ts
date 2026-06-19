@@ -25,7 +25,16 @@ function isProduct(v: unknown): v is ProductResult {
 
 function parseItems(args: unknown): ProductResult[] {
   if (typeof args !== "object" || args === null) return [];
-  const items = (args as { items?: unknown }).items;
+  let items = (args as { items?: unknown }).items;
+  // Speechify client-tool params are scalars, so an array is delivered as a
+  // JSON-encoded string. Accept either the string or an already-parsed array.
+  if (typeof items === "string") {
+    try {
+      items = JSON.parse(items);
+    } catch {
+      return [];
+    }
+  }
   if (!Array.isArray(items)) return [];
   return items.filter(isProduct);
 }
