@@ -3,7 +3,6 @@ import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
 import type { ProductResult } from "../core/products.js";
-import { pushCapture } from "../infra/searchCapture.js";
 import type { AppDeps } from "./deps.js";
 
 /**
@@ -70,26 +69,16 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
   app.post("/", async (c) => {
     // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything.
     const rawBody = await c.req.text();
-
-    // TEMP (wiring): stash the raw envelope in a ring buffer (Railway logs don't
-    // reliably surface per-request stdout) so we can confirm the live contract.
-    const cap = { ts: Date.now(), headers: [...c.req.raw.headers.keys()], body: rawBody, outcome: "pending" };
-    pushCapture(cap);
-
     const ok = verifyHmacSignature({
       rawBody,
       signature: c.req.header(SIGNATURE_HEADER),
       secret: deps.toolHmacSecret,
       timestamp: c.req.header(TIMESTAMP_HEADER),
     });
-    if (!ok) {
-      cap.outcome = "401 invalid_signature";
-      return c.json({ error: "invalid_signature" }, 401);
-    }
+    if (!ok) return c.json({ error: "invalid_signature" }, 401);
 
     // 2. Connection-test probe: signature verified, no work to do.
     if (c.req.header(TEST_HEADER)) {
-      cap.outcome = "200 connection_test";
       return c.json({ ok: true }, 200);
     }
 
@@ -97,32 +86,23 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
     try {
       body = JSON.parse(rawBody) as Record<string, unknown>;
     } catch {
-      cap.outcome = "400 bad_json";
       return c.json({ error: "invalid_request" }, 400);
     }
     const argsParse = argsSchema.safeParse(body.arguments);
-    if (!argsParse.success) {
-      cap.outcome = `400 bad_args: ${argsParse.error.message}`;
-      return c.json({ error: "invalid_request" }, 400);
-    }
+    if (!argsParse.success) return c.json({ error: "invalid_request" }, 400);
     const args = argsParse.data;
 
-    // 3. Resolve scope server-side from the conversation id (sought in any of
-    // the places Speechify might carry it).
+    // 3. Resolve scope server-side from the conversation id. Speechify's tool
+    // webhook sends it via the tool URL (?cid={{system__conversation_id}}); the
+    // body/header are fallbacks.
     const conversationId = resolveConversationId(
       body,
       c.req.header(CONVERSATION_HEADER),
       c.req.query("cid"),
     );
-    if (!conversationId) {
-      cap.outcome = "404 no_conversation_id_in_payload";
-      return c.json({ error: "unknown_conversation" }, 404);
-    }
+    if (!conversationId) return c.json({ error: "unknown_conversation" }, 404);
     const scope = await deps.repo.findScopeByConversationId(conversationId);
-    if (!scope) {
-      cap.outcome = `404 unknown_conversation id=${conversationId}`;
-      return c.json({ error: "unknown_conversation" }, 404);
-    }
+    if (!scope) return c.json({ error: "unknown_conversation" }, 404);
 
     // 4. Search the catalog within the resolved boundary. A catalog failure
     // degrades to an empty result (the agent asks a clarifying question) rather
@@ -138,8 +118,9 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
         optionPreferences: args.color ? ["Color"] : undefined,
         limit: RESULT_LIMIT,
       });
-    } catch (e) {
-      cap.outcome = `500 catalog_error: ${e instanceof Error ? e.message : String(e)}`;
+    } catch {
+      // A catalog failure degrades to empty results (the agent asks a
+      // clarifying question) rather than a 500 it reads aloud as an outage.
       return c.json({ products: [] });
     }
 
@@ -152,8 +133,6 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       });
       return { ...p, checkoutUrl: url };
     });
-
-    cap.outcome = `200 query="${query}" returned=${products.length}`;
 
     // Record the tool call for billing/usage (best-effort; never blocks search).
     void deps.repo

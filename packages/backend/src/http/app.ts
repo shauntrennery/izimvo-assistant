@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { listCaptures } from "../infra/searchCapture.js";
 import type { AppDeps } from "./deps.js";
 import { checkoutRoutes } from "./checkout.js";
 import { searchProductsRoutes } from "./tools.search-products.js";
@@ -71,15 +70,6 @@ export function createApp(deps: AppDeps): Hono {
       return c.body(html);
     });
   }
-
-  // TEMP (wiring): gated read of recent search-tool envelopes. Remove with the
-  // capture buffer once the live contract is confirmed.
-  app.get("/v1/debug/search-capture", (c) => {
-    if (c.req.query("token") !== deps.toolHmacSecret) {
-      return c.json({ error: "forbidden" }, 403);
-    }
-    return c.json({ captures: listCaptures() });
-  });
 
   return app;
 }

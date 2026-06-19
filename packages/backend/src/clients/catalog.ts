@@ -72,6 +72,15 @@ export class CatalogError extends Error {
 const pick = (o: unknown, k: string): unknown =>
   typeof o === "object" && o !== null ? (o as Record<string, unknown>)[k] : undefined;
 
+/** Pull the first UCP error message (`messages[].content`) from structuredContent, if any. */
+function ucpErrorMessage(structured: unknown): string | null {
+  const messages = pick(structured, "messages");
+  if (!Array.isArray(messages)) return null;
+  const err = messages.find((m) => (m as { type?: unknown })?.type === "error");
+  const content = (err as { content?: unknown } | undefined)?.content;
+  return typeof content === "string" ? content : null;
+}
+
 /** Streamable-HTTP MCP may answer as JSON or as an SSE `data:` frame. */
 function parseEnvelope(text: string): unknown {
   try {
@@ -158,11 +167,9 @@ export function createGlobalCatalogClient(
       const structured = await call("search_catalog", { catalog });
       const parsed = searchStructured.safeParse(structured);
       if (!parsed.success) {
-        // TEMP: include the raw structuredContent so we can see the prod shape.
-        const keys = structured && typeof structured === "object" ? Object.keys(structured) : [];
-        throw new CatalogError(
-          `unexpected catalog search response: keys=[${keys.join(",")}] RAW=${JSON.stringify(structured).slice(0, 3500)}`,
-        );
+        // Surface a UCP error message (e.g. unknown saved_catalog_slug) if present.
+        const msg = ucpErrorMessage(structured) ?? parsed.error.message;
+        throw new CatalogError(`catalog search response not usable: ${msg}`);
       }
       return clusteredToResults(parsed.data.products.map(toClustered), {
         maxPriceMinor: input.maxPriceMinor,
