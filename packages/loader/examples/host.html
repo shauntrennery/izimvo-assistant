@@ -3,29 +3,332 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Izimvo loader — local test host</title>
-    <!-- A deliberately hostile host stylesheet, to prove Shadow-DOM isolation. -->
+    <title>Northward Outfitters — advised by Izimvo</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Hanken+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
     <style>
-      button { background: hotpink !important; font-size: 48px !important; }
-      * { color: red !important; }
+      :root {
+        --paper: #efe7d6;
+        --paper-2: #e7dcc6;
+        --ink: #20342a;
+        --ink-soft: #4a5b4f;
+        --pine: #1d3a2c;
+        --ember: #c8552b;
+        --ember-deep: #a8431f;
+        --clay: #b98a5e;
+        --line: rgba(32, 52, 42, 0.16);
+        --display: "Fraunces", Georgia, serif;
+        --body: "Hanken Grotesk", system-ui, sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { margin: 0; }
+
+      body {
+        font-family: var(--body);
+        color: var(--ink);
+        background:
+          radial-gradient(120% 80% at 88% -10%, rgba(200, 85, 43, 0.10), transparent 60%),
+          radial-gradient(90% 70% at -10% 110%, rgba(29, 58, 44, 0.12), transparent 55%),
+          linear-gradient(180deg, var(--paper), var(--paper-2));
+        min-height: 100vh;
+        position: relative;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* fine grain overlay */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+        opacity: 0.5;
+        mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+      }
+
+      .topo {
+        position: fixed;
+        top: -120px;
+        right: -160px;
+        width: 720px;
+        height: 720px;
+        z-index: 0;
+        color: var(--pine);
+        opacity: 0.10;
+        pointer-events: none;
+      }
+      .topo path { fill: none; stroke: currentColor; stroke-width: 1.4; }
+
+      .wrap {
+        position: relative;
+        z-index: 2;
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 28px 120px;
+      }
+
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 30px 0 26px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 19px;
+        letter-spacing: 0.01em;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .brand .mark {
+        width: 22px; height: 22px;
+        border: 1.6px solid var(--ink);
+        border-radius: 50%;
+        position: relative;
+        display: inline-block;
+      }
+      .brand .mark::after {
+        content: ""; position: absolute; inset: 5px;
+        background: var(--ember); border-radius: 50%;
+      }
+      .nav { display: flex; gap: 26px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+      .nav span { cursor: default; }
+
+      /* hero */
+      .hero { padding: 78px 0 54px; max-width: 760px; }
+      .eyebrow {
+        font-size: 12.5px; letter-spacing: 0.34em; text-transform: uppercase;
+        color: var(--ember-deep); font-weight: 600; margin: 0 0 22px;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 400;
+        font-size: clamp(48px, 9vw, 104px);
+        line-height: 0.92;
+        letter-spacing: -0.02em;
+        margin: 0;
+        color: var(--pine);
+      }
+      h1 em { font-style: italic; color: var(--ember); }
+      .lede {
+        margin: 28px 0 0;
+        font-size: clamp(17px, 2.1vw, 20px);
+        line-height: 1.55;
+        max-width: 50ch;
+        color: var(--ink-soft);
+      }
+      .scope {
+        margin-top: 30px;
+        display: inline-flex; align-items: center; gap: 12px;
+        font-size: 13.5px; color: var(--ink-soft);
+        padding: 9px 16px 9px 13px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255,255,255,0.35);
+      }
+      .scope .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ember); box-shadow: 0 0 0 4px rgba(200,85,43,0.15); }
+      .scope b { color: var(--ink); font-weight: 600; }
+
+      /* pursuits */
+      .pursuits-head {
+        display: flex; align-items: flex-end; justify-content: space-between;
+        gap: 16px; margin: 70px 0 22px; padding-bottom: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+      .pursuits-head h2 {
+        font-family: var(--display); font-weight: 600; font-size: 26px; margin: 0; color: var(--pine);
+        letter-spacing: -0.01em;
+      }
+      .pursuits-head p { margin: 0; font-size: 13px; color: var(--ink-soft); letter-spacing: 0.02em; max-width: 34ch; text-align: right; }
+
+      #pursuits {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+      @media (max-width: 760px) { #pursuits { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 480px) { #pursuits { grid-template-columns: 1fr; } .nav { display: none; } }
+
+      .pursuit {
+        appearance: none;
+        text-align: left;
+        font-family: var(--body);
+        background: rgba(255, 255, 255, 0.42);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px 20px 22px;
+        cursor: pointer;
+        color: var(--ink);
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+        display: flex; flex-direction: column; gap: 9px;
+        min-height: 138px;
+      }
+      .pursuit::before {
+        content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+        background: var(--ember); transform: scaleY(0); transform-origin: top; transition: transform 0.22s ease;
+      }
+      .pursuit:hover { transform: translateY(-3px); border-color: rgba(32,52,42,0.32); box-shadow: 0 14px 30px rgba(29,58,44,0.10); }
+      .pursuit:hover::before { transform: scaleY(1); }
+      .pursuit__idx { font-family: var(--display); font-size: 13px; color: var(--clay); letter-spacing: 0.1em; }
+      .pursuit__label { font-family: var(--display); font-size: 22px; font-weight: 600; line-height: 1.05; color: var(--pine); }
+      .pursuit__note { font-size: 13.5px; line-height: 1.45; color: var(--ink-soft); }
+
+      .pursuit.is-active {
+        background: var(--pine);
+        border-color: var(--pine);
+        box-shadow: 0 16px 34px rgba(29,58,44,0.22);
+      }
+      .pursuit.is-active::before { transform: scaleY(1); }
+      .pursuit.is-active .pursuit__label { color: #f6efe0; }
+      .pursuit.is-active .pursuit__note { color: rgba(246,239,224,0.72); }
+      .pursuit.is-active .pursuit__idx { color: var(--ember); }
+      .pursuit.is-active::after {
+        content: "Adviser scope"; position: absolute; right: 16px; top: 16px;
+        font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(246,239,224,0.6);
+      }
+
+      /* orb hint */
+      .hint {
+        position: fixed; right: 26px; bottom: 78px; z-index: 3;
+        font-size: 13px; color: var(--ink-soft); font-style: italic;
+        font-family: var(--display);
+        opacity: 0; transform: translateY(6px);
+        animation: hintIn 0.6s ease 1.6s forwards;
+        pointer-events: none; text-align: right;
+      }
+      @keyframes hintIn { to { opacity: 1; transform: none; } }
+
+      footer { margin-top: 64px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-soft); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+
+      /* staggered load reveal */
+      .reveal { opacity: 0; transform: translateY(14px); animation: rise 0.7s cubic-bezier(0.2,0.7,0.2,1) forwards; }
+      @keyframes rise { to { opacity: 1; transform: none; } }
+      .d1 { animation-delay: 0.05s; } .d2 { animation-delay: 0.15s; }
+      .d3 { animation-delay: 0.27s; } .d4 { animation-delay: 0.4s; } .d5 { animation-delay: 0.5s; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .reveal, .hint { animation: none; opacity: 1; transform: none; }
+      }
     </style>
   </head>
+
   <body>
-    <h1>Demo outdoor store</h1>
-    <p>Tap the orb (bottom-right) to talk to the adviser.</p>
+    <svg class="topo" viewBox="0 0 400 410" aria-hidden="true">
+      <defs>
+        <path id="ridge" d="M200,86 C262,84 322,124 330,192 C338,262 288,330 200,330 C118,330 70,268 76,194 C82,122 142,88 200,86 Z" />
+      </defs>
+      <use href="#ridge" transform="translate(120,123) scale(0.40)" />
+      <use href="#ridge" transform="translate(96,98) scale(0.52)" />
+      <use href="#ridge" transform="translate(72,74) scale(0.64)" />
+      <use href="#ridge" transform="translate(48,49) scale(0.76)" />
+      <use href="#ridge" transform="translate(24,25) scale(0.88)" />
+      <use href="#ridge" transform="translate(0,0) scale(1)" />
+    </svg>
+
+    <div class="wrap">
+      <header class="reveal d1">
+        <div class="brand"><span class="mark"></span>Northward Outfitters</div>
+        <nav class="nav"><span>Field Guide</span><span>Catalogue</span><span>Stockists</span></nav>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow reveal d1">Voice-led outfitting</p>
+        <h1 class="reveal d2">Gear,<br />properly <em>advised.</em></h1>
+        <p class="lede reveal d3">
+          Don't scroll a thousand SKUs. Tell our adviser what the day demands —
+          terrain, weather, budget — and it narrows the field to the few things
+          worth carrying, then hands you straight to checkout.
+        </p>
+        <div class="scope reveal d4">
+          <span class="dot"></span> Adviser scoped to <b id="scope-cat">Trail Running</b>
+        </div>
+      </section>
+
+      <div class="pursuits-head reveal d4">
+        <h2>Shop by pursuit</h2>
+        <p>Pick a pursuit to scope the adviser before you talk.</p>
+      </div>
+      <div id="pursuits" class="reveal d5"></div>
+
+      <footer class="reveal d5">
+        <span>© Northward Outfitters — a demo storefront.</span>
+        <span>Advised by Izimvo · widget isolated in Shadow DOM</span>
+      </footer>
+    </div>
+
+    <p class="hint">Tap the orb to talk →</p>
 
     <!--
-      The embed contract (PLAN §7.1). The loader is served from our backend and
-      derives its API base from that origin, so no data-api-base is needed.
-      Serve this file from an allowlisted origin (the demo site-key allows
-      `localhost`, so `npx serve packages/loader/examples` works) — the browser
-      treats localhost as a secure context, which mic/audio require.
+      Host-side bootstrap: render the pursuit picker, reflect the active scope,
+      and inject the Izimvo loader for the chosen category. The adviser's scope
+      is fixed at session-mint, so changing pursuit re-mints via a quick reload.
+      The loader derives its API base from its own origin (our backend).
     -->
-    <script
-      src="https://izimvo-backend-production.up.railway.app/v1/loader.js"
-      data-site-key="pk_live_demo"
-      data-category="trail-running"
-      data-locale="en-ZA"
-    ></script>
+    <script>
+      (function () {
+        var CATS = [
+          { slug: "trail-running", label: "Trail Running", note: "Featherweight shoes for fast, technical miles." },
+          { slug: "hiking-boots", label: "Hiking Boots", note: "Ankle support and grip for the long approach." },
+          { slug: "rain-shells", label: "Rain Shells", note: "Packable waterproof layers for changeable skies." },
+          { slug: "backpacks", label: "Backpacks", note: "Load-haulers from summit packs to thru-hikes." },
+          { slug: "sleeping-bags", label: "Sleeping Bags", note: "Down and synthetic warmth, rated by season." },
+          { slug: "tents", label: "Tents", note: "Shelters from fast-and-light to basecamp." }
+        ];
+
+        var params = new URLSearchParams(location.search);
+        var requested = params.get("category");
+        var active = CATS.some(function (c) { return c.slug === requested; }) ? requested : CATS[0].slug;
+
+        var grid = document.getElementById("pursuits");
+        grid.innerHTML = CATS.map(function (c, i) {
+          var idx = ("0" + (i + 1)).slice(-2);
+          var on = c.slug === active ? " is-active" : "";
+          return (
+            '<button class="pursuit' + on + '" data-slug="' + c.slug + '"' +
+            (c.slug === active ? ' aria-current="true"' : "") + ">" +
+            '<span class="pursuit__idx">' + idx + "</span>" +
+            '<span class="pursuit__label">' + c.label + "</span>" +
+            '<span class="pursuit__note">' + c.note + "</span>" +
+            "</button>"
+          );
+        }).join("");
+
+        grid.addEventListener("click", function (e) {
+          var btn = e.target.closest(".pursuit");
+          if (!btn) return;
+          var slug = btn.getAttribute("data-slug");
+          if (slug === active) return;
+          var p = new URLSearchParams(location.search);
+          p.set("category", slug);
+          location.search = p.toString();
+        });
+
+        var current = CATS.find(function (c) { return c.slug === active; });
+        document.getElementById("scope-cat").textContent = current.label;
+
+        var s = document.createElement("script");
+        s.src = "https://izimvo-backend-production.up.railway.app/v1/loader.js";
+        s.setAttribute("data-site-key", "pk_live_demo");
+        s.setAttribute("data-category", active);
+        s.setAttribute("data-locale", "en-ZA");
+        document.body.appendChild(s);
+      })();
+    </script>
   </body>
 </html>

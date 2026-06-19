@@ -32,10 +32,14 @@ async function main() {
     rateLimitRpm: 60,
   });
 
-  await db.insert(categories).values([
-    { siteId, slug: "trail-running", taxonomyId: null, savedCatalogSlug: "trail-running-za" },
-    { siteId, slug: "hiking-boots", taxonomyId: null, savedCatalogSlug: "hiking-boots-za" },
-  ]);
+  // Demo categories. savedCatalogSlug null → unscoped global-catalog search
+  // (scoped only by the shopper's query); set a real Shopify saved-catalog slug
+  // to hard-bound a category to a curated catalog.
+  await db.insert(categories).values(
+    ["trail-running", "hiking-boots", "rain-shells", "backpacks", "sleeping-bags", "tents"].map(
+      (slug) => ({ siteId, slug, taxonomyId: null, savedCatalogSlug: null }),
+    ),
+  );
 
   // eslint-disable-next-line no-console
   console.log(`Seeded site ${siteId} with key pk_live_demo`);
