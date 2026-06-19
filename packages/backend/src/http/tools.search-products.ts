@@ -44,13 +44,25 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
   app.post("/", async (c) => {
     // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything.
     const rawBody = await c.req.text();
+
+    // TEMP (wiring): capture the real tool-call envelope so we can confirm where
+    // conversation_id lives on a live call. Remove once the contract is locked.
+    // eslint-disable-next-line no-console
+    console.log(
+      `[search:in] headers=[${[...c.req.raw.headers.keys()].join(",")}] body=${rawBody}`,
+    );
+
     const ok = verifyHmacSignature({
       rawBody,
       signature: c.req.header(SIGNATURE_HEADER),
       secret: deps.toolHmacSecret,
       timestamp: c.req.header(TIMESTAMP_HEADER),
     });
-    if (!ok) return c.json({ error: "invalid_signature" }, 401);
+    if (!ok) {
+      // eslint-disable-next-line no-console
+      console.log("[search:out] 401 invalid_signature");
+      return c.json({ error: "invalid_signature" }, 401);
+    }
 
     // 2. Connection-test probe: signature verified, no work to do.
     if (c.req.header(TEST_HEADER)) {
@@ -64,13 +76,21 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       return c.json({ error: "invalid_request" }, 400);
     }
     const parsed = requestSchema.safeParse(json);
-    if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
+    if (!parsed.success) {
+      // eslint-disable-next-line no-console
+      console.log(`[search:out] 400 invalid_request: ${parsed.error.message}`);
+      return c.json({ error: "invalid_request" }, 400);
+    }
     const { conversation_id } = parsed.data;
     const args = parsed.data.arguments;
 
     // 3. Resolve scope server-side from the conversation id.
     const scope = await deps.repo.findScopeByConversationId(conversation_id);
-    if (!scope) return c.json({ error: "unknown_conversation" }, 404);
+    if (!scope) {
+      // eslint-disable-next-line no-console
+      console.log(`[search:out] 404 unknown_conversation conversation_id=${conversation_id}`);
+      return c.json({ error: "unknown_conversation" }, 404);
+    }
 
     // 4. Search the catalog within the resolved boundary.
     const query = args.color ? `${args.color} ${args.query}` : args.query;
@@ -92,6 +112,9 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       });
       return { ...p, checkoutUrl: url };
     });
+
+    // eslint-disable-next-line no-console
+    console.log(`[search:out] 200 query="${query}" returned=${products.length}`);
 
     // Record the tool call for billing/usage (best-effort; never blocks search).
     void deps.repo
