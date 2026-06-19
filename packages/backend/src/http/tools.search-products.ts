@@ -3,6 +3,7 @@ import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
 import type { ProductResult } from "../core/products.js";
+import { pushCapture } from "../infra/searchCapture.js";
 import type { AppDeps } from "./deps.js";
 
 /**
@@ -28,15 +29,31 @@ const TEST_HEADER = "x-speechify-webhook-test";
 const DEFAULT_SHIPS_TO = "ZA";
 const RESULT_LIMIT = 3;
 
-const requestSchema = z.object({
-  conversation_id: z.string().min(1),
-  arguments: z.object({
-    query: z.string().min(1),
-    max_price: z.number().positive().optional(),
-    color: z.string().min(1).optional(),
-    ships_to: z.string().min(2).optional(),
-  }),
+const CONVERSATION_HEADER = "x-speechify-conversation-id";
+
+const argsSchema = z.object({
+  query: z.string().min(1),
+  max_price: z.number().positive().optional(),
+  color: z.string().min(1).optional(),
+  ships_to: z.string().min(2).optional(),
 });
+
+function firstString(values: unknown[]): string | null {
+  for (const v of values) if (typeof v === "string" && v.length > 0) return v;
+  return null;
+}
+
+/** Resolve the conversation id from the various places Speechify might put it. */
+function resolveConversationId(body: Record<string, unknown>, header: string | undefined): string | null {
+  const conversation = body.conversation as { id?: unknown } | undefined;
+  return firstString([
+    body.conversation_id,
+    body.conversationId,
+    conversation?.id,
+    body.conversation_id_,
+    header,
+  ]);
+}
 
 export function searchProductsRoutes(deps: AppDeps): Hono {
   const app = new Hono();
@@ -45,12 +62,10 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
     // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything.
     const rawBody = await c.req.text();
 
-    // TEMP (wiring): capture the real tool-call envelope so we can confirm where
-    // conversation_id lives on a live call. Remove once the contract is locked.
-    // eslint-disable-next-line no-console
-    console.log(
-      `[search:in] headers=[${[...c.req.raw.headers.keys()].join(",")}] body=${rawBody}`,
-    );
+    // TEMP (wiring): stash the raw envelope in a ring buffer (Railway logs don't
+    // reliably surface per-request stdout) so we can confirm the live contract.
+    const cap = { ts: Date.now(), headers: [...c.req.raw.headers.keys()], body: rawBody, outcome: "pending" };
+    pushCapture(cap);
 
     const ok = verifyHmacSignature({
       rawBody,
@@ -59,36 +74,40 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       timestamp: c.req.header(TIMESTAMP_HEADER),
     });
     if (!ok) {
-      // eslint-disable-next-line no-console
-      console.log("[search:out] 401 invalid_signature");
+      cap.outcome = "401 invalid_signature";
       return c.json({ error: "invalid_signature" }, 401);
     }
 
     // 2. Connection-test probe: signature verified, no work to do.
     if (c.req.header(TEST_HEADER)) {
+      cap.outcome = "200 connection_test";
       return c.json({ ok: true }, 200);
     }
 
-    let json: unknown;
+    let body: Record<string, unknown>;
     try {
-      json = JSON.parse(rawBody);
+      body = JSON.parse(rawBody) as Record<string, unknown>;
     } catch {
+      cap.outcome = "400 bad_json";
       return c.json({ error: "invalid_request" }, 400);
     }
-    const parsed = requestSchema.safeParse(json);
-    if (!parsed.success) {
-      // eslint-disable-next-line no-console
-      console.log(`[search:out] 400 invalid_request: ${parsed.error.message}`);
+    const argsParse = argsSchema.safeParse(body.arguments);
+    if (!argsParse.success) {
+      cap.outcome = `400 bad_args: ${argsParse.error.message}`;
       return c.json({ error: "invalid_request" }, 400);
     }
-    const { conversation_id } = parsed.data;
-    const args = parsed.data.arguments;
+    const args = argsParse.data;
 
-    // 3. Resolve scope server-side from the conversation id.
-    const scope = await deps.repo.findScopeByConversationId(conversation_id);
+    // 3. Resolve scope server-side from the conversation id (sought in any of
+    // the places Speechify might carry it).
+    const conversationId = resolveConversationId(body, c.req.header(CONVERSATION_HEADER));
+    if (!conversationId) {
+      cap.outcome = "404 no_conversation_id_in_payload";
+      return c.json({ error: "unknown_conversation" }, 404);
+    }
+    const scope = await deps.repo.findScopeByConversationId(conversationId);
     if (!scope) {
-      // eslint-disable-next-line no-console
-      console.log(`[search:out] 404 unknown_conversation conversation_id=${conversation_id}`);
+      cap.outcome = `404 unknown_conversation id=${conversationId}`;
       return c.json({ error: "unknown_conversation" }, 404);
     }
 
@@ -113,8 +132,7 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       return { ...p, checkoutUrl: url };
     });
 
-    // eslint-disable-next-line no-console
-    console.log(`[search:out] 200 query="${query}" returned=${products.length}`);
+    cap.outcome = `200 query="${query}" returned=${products.length}`;
 
     // Record the tool call for billing/usage (best-effort; never blocks search).
     void deps.repo

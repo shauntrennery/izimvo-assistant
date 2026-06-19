@@ -2,7 +2,7 @@ import { parseConfig } from "./attributes.js";
 import { createCart, type Cart } from "./cart.js";
 import { createCheckoutReporter, type CheckoutReporter } from "./checkout.js";
 import { createAudioGate, type AudioGate } from "./mic.js";
-import { loadSpeechifyRuntime, toOrbStatus, type AgentRuntime } from "./runtime.js";
+import { loadSpeechifyRuntime, toOrbStatus, type AgentHandle, type AgentRuntime } from "./runtime.js";
 import { fetchSession } from "./session.js";
 import { registerClientTools } from "./tools.js";
 import type { LoaderConfig } from "./types.js";
@@ -37,11 +37,32 @@ export interface BootDeps {
 }
 
 export function boot(deps: BootDeps): void {
-  let starting = false;
+  let handle: AgentHandle | null = null;
+  let connecting = false;
+
+  function teardown(): void {
+    deps.audio.teardown();
+    deps.cart.clear();
+    handle = null;
+    connecting = false;
+  }
 
   deps.widget.onActivate(async () => {
-    if (starting) return;
-    starting = true;
+    // A tap while a session is live ends it (the disconnect affordance).
+    if (handle) {
+      const live = handle;
+      handle = null;
+      deps.widget.setStatus("ended");
+      try {
+        await live.stop();
+      } catch {
+        /* already gone */
+      }
+      teardown();
+      return;
+    }
+    if (connecting) return; // mid-handshake; ignore extra taps
+    connecting = true;
     deps.widget.setStatus("connecting");
 
     try {
@@ -56,7 +77,7 @@ export function boot(deps: BootDeps): void {
       });
 
       const runtime = await deps.loadRuntime();
-      const handle = await runtime.startAgent({
+      handle = await runtime.startAgent({
         sessionToken: session.sessionToken,
         sessionUrl: session.sessionUrl,
         // The runtime drives the orb via status callbacks (idle→connecting→
@@ -64,18 +85,14 @@ export function boot(deps: BootDeps): void {
         onStatus: (raw) => {
           const status = toOrbStatus(raw);
           deps.widget.setStatus(status);
-          if (status === "ended") {
-            deps.audio.teardown();
-            deps.cart.clear();
-            starting = false;
-          }
+          if (status === "ended") teardown();
         },
         onError: () => {
           deps.widget.setStatus("error");
-          deps.audio.teardown();
-          starting = false;
+          teardown();
         },
       });
+      connecting = false;
 
       registerClientTools(handle, {
         widget: deps.widget,
@@ -84,8 +101,7 @@ export function boot(deps: BootDeps): void {
       });
     } catch {
       deps.widget.setStatus("error");
-      deps.audio.teardown();
-      starting = false;
+      teardown();
     }
   });
 }

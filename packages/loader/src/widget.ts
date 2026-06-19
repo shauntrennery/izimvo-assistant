@@ -28,11 +28,11 @@ export interface WidgetOptions {
 const STATUS_LABEL: Record<OrbStatus, string> = {
   idle: "Tap to talk",
   connecting: "Connecting…",
-  listening: "Listening…",
+  listening: "Listening — tap to end",
   thinking: "Thinking…",
-  speaking: "Speaking…",
+  speaking: "Speaking — tap to end",
   ended: "Tap to talk again",
-  error: "Something went wrong",
+  error: "Tap to retry",
 };
 
 function styles(reducedMotion: boolean): string {

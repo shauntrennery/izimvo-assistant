@@ -135,4 +135,18 @@ describe("boot", () => {
     await Promise.all([h.activate(), h.activate()]);
     expect(h.runtime.startAgent).toHaveBeenCalledTimes(1);
   });
+
+  it("a tap while live disconnects the session", async () => {
+    const h = harness();
+    await h.activate(); // start
+    expect(h.runtime.startAgent).toHaveBeenCalledTimes(1);
+
+    await h.activate(); // tap again → end
+    expect(h.handle.stop).toHaveBeenCalledOnce();
+    expect(h.statuses.at(-1)).toBe("ended");
+    expect(h.audio.teardown).toHaveBeenCalled();
+
+    await h.activate(); // a fresh tap starts a new session
+    expect(h.runtime.startAgent).toHaveBeenCalledTimes(2);
+  });
 });
