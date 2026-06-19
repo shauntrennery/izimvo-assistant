@@ -63,4 +63,12 @@ pnpm typecheck
   interface, `POST /v1/tools/search-products` with HMAC verify, server-side
   scope resolution from the conversation id, ≤3 results, UTM-tagged checkout
   URLs. Contract test: signed → ≤3 tagged products; unsigned → 401.
-- Phases 3–6: in progress per PLAN.md §10.
+- **Phase 3 — loader + widget** ✅ `packages/loader`: data-* attribute parsing,
+  `/v1/session` mint, agent-runtime adapter (SDK isolated behind an interface),
+  client tools (`render_products`/`update_cart`/`open_checkout`) with arg
+  guards, Shadow-DOM widget (orb states, product cards, `prefers-reduced-motion`),
+  iOS-safe audio unlock on the orb tap, clean teardown on `ended`. Entry bundle
+  **3.3 KB gzip** (budget < 15 KB). Local test page:
+  `packages/loader/examples/host.html`. The live voice loop additionally needs
+  the Phase 0 Speechify agent + SDK wired into `loadRuntime`.
+- Phases 4–6: in progress per PLAN.md §10.

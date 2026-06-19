@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en-ZA">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Izimvo loader — local test host</title>
+    <!-- A deliberately hostile host stylesheet, to prove Shadow-DOM isolation. -->
+    <style>
+      button { background: hotpink !important; font-size: 48px !important; }
+      * { color: red !important; }
+    </style>
+  </head>
+  <body>
+    <h1>Demo outdoor store</h1>
+    <p>Tap the orb (bottom-right) to talk to the adviser.</p>
+
+    <!--
+      The embed contract (PLAN §7.1). For local testing, data-api-base points the
+      loader at your backend; in production the base is baked into the bundle.
+      The Speechify runtime must be wired (Phase 0) for the live voice loop;
+      without it, the orb renders and a tap mints a session, then surfaces the
+      "runtime not configured" error state.
+    -->
+    <script
+      src="../dist/loader.global.js"
+      data-site-key="pk_live_demo"
+      data-category="trail-running"
+      data-locale="en-ZA"
+      data-api-base="http://localhost:8787"
+    ></script>
+  </body>
+</html>
