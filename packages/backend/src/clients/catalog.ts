@@ -158,7 +158,10 @@ export function createGlobalCatalogClient(
       const structured = await call("search_catalog", { catalog });
       const parsed = searchStructured.safeParse(structured);
       if (!parsed.success) {
-        throw new CatalogError(`unexpected catalog search response: ${parsed.error.message}`);
+        // TEMP: include the raw structuredContent so we can see the prod shape.
+        throw new CatalogError(
+          `unexpected catalog search response: ${parsed.error.message} :: RAW=${JSON.stringify(structured).slice(0, 600)}`,
+        );
       }
       return clusteredToResults(parsed.data.products.map(toClustered), {
         maxPriceMinor: input.maxPriceMinor,
