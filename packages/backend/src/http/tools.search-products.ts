@@ -43,14 +43,23 @@ function firstString(values: unknown[]): string | null {
   return null;
 }
 
-/** Resolve the conversation id from the various places Speechify might put it. */
-function resolveConversationId(body: Record<string, unknown>, header: string | undefined): string | null {
+/**
+ * Resolve the conversation id. Speechify's tool webhook carries NO conversation
+ * context in the body/headers by default, so we inject it via the tool URL:
+ * `?cid={{system__conversation_id}}` (interpolated per session). The body/header
+ * spots are kept as fallbacks in case the contract changes.
+ */
+function resolveConversationId(
+  body: Record<string, unknown>,
+  header: string | undefined,
+  query: string | undefined,
+): string | null {
   const conversation = body.conversation as { id?: unknown } | undefined;
   return firstString([
+    query,
     body.conversation_id,
     body.conversationId,
     conversation?.id,
-    body.conversation_id_,
     header,
   ]);
 }
@@ -100,7 +109,11 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
 
     // 3. Resolve scope server-side from the conversation id (sought in any of
     // the places Speechify might carry it).
-    const conversationId = resolveConversationId(body, c.req.header(CONVERSATION_HEADER));
+    const conversationId = resolveConversationId(
+      body,
+      c.req.header(CONVERSATION_HEADER),
+      c.req.query("cid"),
+    );
     if (!conversationId) {
       cap.outcome = "404 no_conversation_id_in_payload";
       return c.json({ error: "unknown_conversation" }, 404);

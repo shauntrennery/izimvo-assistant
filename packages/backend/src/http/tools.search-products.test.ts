@@ -80,6 +80,28 @@ describe("POST /v1/tools/search-products", () => {
     }
   });
 
+  it("resolves the conversation id from the ?cid= query (real Speechify envelope)", async () => {
+    // Real tool payload carries no conversation_id; it arrives via the tool URL.
+    const realEnvelope = {
+      tool_name: "search_products",
+      tool_call_id: "tc_1",
+      timestamp: Number(TS),
+      arguments: { query: "trail shoes", max_price: 250 },
+    };
+    const raw = JSON.stringify(realEnvelope);
+    const res = await ctx.app.request(`/v1/tools/search-products?cid=${CONV_ID}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-speechify-timestamp": TS,
+        "x-speechify-signature": `sha256=${sign(raw)}`,
+      },
+      body: raw,
+    });
+    expect(res.status).toBe(200);
+    expect(ctx.catalog.lastInput?.savedCatalogSlug).toBe("trail-running-za");
+  });
+
   it("resolves the catalog scope server-side from the conversation id", async () => {
     await post(validBody);
     expect(ctx.catalog.lastInput?.savedCatalogSlug).toBe("trail-running-za");
