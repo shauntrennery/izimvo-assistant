@@ -14,6 +14,7 @@ import type { AppDeps } from "./deps.js";
  */
 
 const SIGNATURE_HEADER = "x-speechify-signature";
+const TIMESTAMP_HEADER = "x-speechify-timestamp";
 
 // Tolerant envelope — store whatever the post-call payload carries. The exact
 // field set is confirmed against the Speechify post-call schema; only
@@ -38,6 +39,7 @@ export function speechifyWebhookRoutes(deps: AppDeps): Hono {
       rawBody,
       signature: c.req.header(SIGNATURE_HEADER),
       secret: deps.webhookHmacSecret,
+      timestamp: c.req.header(TIMESTAMP_HEADER),
     });
     if (!ok) return c.json({ error: "invalid_signature" }, 401);
 

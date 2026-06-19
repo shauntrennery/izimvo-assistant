@@ -9,6 +9,9 @@ const envSchema = z.object({
   SPEECHIFY_API_KEY: z.string().min(1),
   SPEECHIFY_AGENT_ID: z.string().min(1),
   SPEECHIFY_WEBHOOK_HMAC_SECRET: z.string().min(1),
+  // The search_products tool mints its own signing secret on create (distinct
+  // from the post-call webhook secret); shown once in the Speechify console.
+  SPEECHIFY_TOOL_HMAC_SECRET: z.string().min(1),
   SPEECHIFY_API_BASE: z.string().url().default("https://api.speechify.ai"),
 
   SHOPIFY_CATALOG_CLIENT_ID: z.string().min(1),

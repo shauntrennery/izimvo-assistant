@@ -82,7 +82,9 @@ export function sessionRoutes(deps: AppDeps): Hono {
         locale,
         userIdentity: req.userIdentity ?? null,
       });
-    } catch {
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[session mint failed]", e instanceof Error ? e.message : e);
       return c.json({ error: "session_mint_failed" }, 502);
     }
 

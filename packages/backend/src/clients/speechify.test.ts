@@ -25,9 +25,15 @@ describe("createSpeechifyClient.mintSession", () => {
         merchant_scope: "global",
         locale: "en-ZA",
       });
-      expect(body.override_language).toBe("en-ZA");
+      expect(body.user_identity).toBe("user-1");
+      expect(body).not.toHaveProperty("override_language");
+      // CreateConversationResponse shape: token + url + conversation.id
       return new Response(
-        JSON.stringify({ sessionToken: "tok", sessionUrl: "wss://rt.test/s/1" }),
+        JSON.stringify({
+          token: "tok",
+          url: "wss://rt.test/s/1",
+          conversation: { id: "conv_42" },
+        }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     });
@@ -37,12 +43,12 @@ describe("createSpeechifyClient.mintSession", () => {
       category: "trail running",
       merchantScope: "global",
       locale: "en-ZA",
-      userIdentity: null,
+      userIdentity: "user-1",
     });
     expect(minted).toEqual({
       sessionToken: "tok",
       sessionUrl: "wss://rt.test/s/1",
-      conversationId: null,
+      conversationId: "conv_42",
     });
   });
 
@@ -77,8 +83,21 @@ describe("verifyHmacSignature", () => {
   it("accepts a correct signature", () => {
     expect(verifyHmacSignature({ rawBody, signature: valid, secret })).toBe(true);
   });
-  it("accepts a sha256= prefixed signature", () => {
+  it("accepts a sha256= prefixed hex signature", () => {
     expect(verifyHmacSignature({ rawBody, signature: `sha256=${valid}`, secret })).toBe(true);
+  });
+
+  it("accepts Speechify's sha256=<base64> signature", () => {
+    const b64 = createHmac("sha256", secret).update(rawBody).digest("base64");
+    expect(verifyHmacSignature({ rawBody, signature: `sha256=${b64}`, secret })).toBe(true);
+  });
+
+  it("verifies the real scheme: hex of `${timestamp}.${body}`", () => {
+    const timestamp = "1781862411670";
+    const sig = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
+    expect(verifyHmacSignature({ rawBody, signature: `sha256=${sig}`, secret, timestamp })).toBe(true);
+    // ...and rejects when the timestamp is omitted (payload differs)
+    expect(verifyHmacSignature({ rawBody, signature: `sha256=${sig}`, secret })).toBe(false);
   });
   it("rejects a tampered body", () => {
     expect(verifyHmacSignature({ rawBody: rawBody + " ", signature: valid, secret })).toBe(false);

@@ -12,8 +12,10 @@ export interface AppDeps {
   speechify: SpeechifyClient;
   catalog: CatalogClient;
   rateLimiter: RateLimiter;
-  /** Shared HMAC secret for Speechify-signed webhooks (search tool + post-call). */
+  /** HMAC secret for the post-call webhook (set by us in the Speechify console). */
   webhookHmacSecret: string;
+  /** HMAC secret for the search_products tool (auto-minted by Speechify on create). */
+  toolHmacSecret: string;
   /** ATTRIBUTION_UTM_SOURCE — stamped on every checkout URL. */
   utmSource: string;
   /** Per-IP burst ceiling for /v1/session, independent of per-key rpm. */

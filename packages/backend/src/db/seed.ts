@@ -1,4 +1,5 @@
 import { loadEnv } from "../config/env.js";
+import { loadDotEnv } from "../config/loadDotenv.js";
 import { createDb } from "./client.js";
 import { apiKeys, categories, sites } from "./schema.js";
 
@@ -7,6 +8,7 @@ import { apiKeys, categories, sites } from "./schema.js";
  * for now — no self-serve dashboard in v1). Idempotent on the public key.
  */
 async function main() {
+  loadDotEnv();
   const env = loadEnv();
   const db = createDb(env.DATABASE_URL);
 

@@ -20,6 +20,7 @@ export function buildApp(overrides: Partial<AppDeps> = {}) {
     speechify: createFakeSpeechify(),
     rateLimiter: createMemoryRateLimiter(),
     webhookHmacSecret: "whsec_test",
+    toolHmacSecret: "toolsec_test",
     utmSource: "izimvo",
     sessionIpRateLimitPerMin: 30,
     ...overrides,

@@ -3,14 +3,16 @@ import { createGlobalCatalogClient } from "./clients/catalog.js";
 import { createJwtCache } from "./clients/jwtCache.js";
 import { createSpeechifyClient } from "./clients/speechify.js";
 import { loadEnv } from "./config/env.js";
+import { loadDotEnv } from "./config/loadDotenv.js";
 import { createDb } from "./db/client.js";
 import { createRepo } from "./db/repo.js";
 import { createApp } from "./http/app.js";
 import { createMemoryRateLimiter } from "./infra/rateLimiter.js";
 
 /**
- * Production composition root: parse env (fail-fast), wire real adapters, serve.
+ * Production composition root: load .env, parse env (fail-fast), wire adapters.
  */
+loadDotEnv();
 const env = loadEnv();
 
 const jwt = createJwtCache({
@@ -29,11 +31,14 @@ const app = createApp({
   catalog: createGlobalCatalogClient({ mcpUrl: env.SHOPIFY_CATALOG_MCP_URL }, jwt),
   rateLimiter: createMemoryRateLimiter(),
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
+  toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,
   utmSource: env.ATTRIBUTION_UTM_SOURCE,
   sessionIpRateLimitPerMin: 30,
 });
 
-serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+// Bind 0.0.0.0 so the platform (Railway) can route to the container; PORT is
+// injected by the platform and validated/defaulted in env.ts.
+serve({ fetch: app.fetch, port: env.PORT, hostname: "0.0.0.0" }, (info) => {
   // eslint-disable-next-line no-console
-  console.log(`izimvo backend listening on :${info.port}`);
+  console.log(`izimvo backend listening on ${info.address}:${info.port}`);
 });

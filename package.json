@@ -8,7 +8,9 @@
   "scripts": {
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @izimvo/backend start",
+    "db:migrate": "pnpm --filter @izimvo/backend db:migrate"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

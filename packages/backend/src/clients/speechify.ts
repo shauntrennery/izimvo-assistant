@@ -33,12 +33,14 @@ export interface SpeechifyClient {
   mintSession(input: MintSessionInput): Promise<MintedSession>;
 }
 
-// Speechify returns at least these fields; tolerate extras. The exact names are
-// the thing to confirm against the API reference — isolated to this schema.
+// CreateConversationResponse (confirmed via docs.speechify.ai): the realtime
+// `token` + `url`, plus the created `conversation` (whose id we store so the
+// search-tool webhook can be correlated back to this session's scope). Extra
+// fields are tolerated.
 const mintResponseSchema = z.object({
-  sessionToken: z.string().min(1),
-  sessionUrl: z.string().url(),
-  conversationId: z.string().min(1).optional(),
+  token: z.string().min(1),
+  url: z.string().min(1),
+  conversation: z.object({ id: z.string().min(1) }).optional(),
 });
 
 export interface SpeechifyConfig {
@@ -75,13 +77,15 @@ export function createSpeechifyClient(
           "content-type": "application/json",
         },
         body: JSON.stringify({
+          // These vars must be declared on the agent (PLAN §8) or they're
+          // rejected. Locale rides as a dynamic variable; there is no top-level
+          // override_language field in the documented API.
           dynamic_variables: {
             category: input.category,
             merchant_scope: input.merchantScope,
             locale: input.locale,
           },
           user_identity: input.userIdentity,
-          override_language: input.locale,
         }),
       });
 
@@ -100,43 +104,51 @@ export function createSpeechifyClient(
         );
       }
       return {
-        sessionToken: parsed.data.sessionToken,
-        sessionUrl: parsed.data.sessionUrl,
-        conversationId: parsed.data.conversationId ?? null,
+        sessionToken: parsed.data.token,
+        sessionUrl: parsed.data.url,
+        conversationId: parsed.data.conversation?.id ?? null,
       };
     },
   };
 }
 
 /**
- * Verify an HMAC-SHA256 signature over the exact raw request body
- * (Guardrails §11.10). Used by the search tool and the post-call webhook.
- * Constant-time comparison; tolerant of an optional `sha256=` prefix.
+ * Verify a Speechify webhook signature (Guardrails §11.10). Used by the search
+ * tool and the post-call webhook.
+ *
+ * Confirmed empirically against the live Speechify console: the signed payload
+ * is `${timestamp}.${rawBody}` (Stripe-style, timestamp from the
+ * `X-Speechify-Timestamp` header) and the digest is hex — NOT base64-of-body as
+ * the UI note claims. When no timestamp is supplied we fall back to signing the
+ * body alone, and we accept hex/base64/base64url, so the verifier also serves
+ * hex/base64-signing callers and our own tests. Constant-time comparison.
  */
 export function verifyHmacSignature(input: {
   rawBody: string;
   signature: string | null | undefined;
   secret: string;
+  /** X-Speechify-Timestamp header; when present, the signed payload is `${ts}.${body}`. */
+  timestamp?: string | null;
 }): boolean {
-  const { rawBody, signature, secret } = input;
+  const { rawBody, signature, secret, timestamp } = input;
   if (!signature) return false;
 
   const provided = signature.startsWith("sha256=")
     ? signature.slice("sha256=".length)
     : signature;
 
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const payload = timestamp ? `${timestamp}.${rawBody}` : rawBody;
+  const expected = createHmac("sha256", secret).update(payload).digest(); // raw bytes
 
-  // Both hex strings of equal length when valid; bail before timingSafeEqual
-  // (which throws on length mismatch) to keep the comparison constant-time on
-  // the happy path without leaking length via an exception.
-  const a = Buffer.from(expected, "hex");
-  let b: Buffer;
-  try {
-    b = Buffer.from(provided, "hex");
-  } catch {
-    return false;
+  // Decode the provided signature under each encoding and compare to the raw
+  // digest. base64 (44 chars) / base64url / hex (64 chars) have distinct
+  // lengths, so trying all is unambiguous. Length-guard before timingSafeEqual
+  // (it throws on mismatched lengths).
+  for (const encoding of ["hex", "base64", "base64url"] as const) {
+    const candidate = Buffer.from(provided, encoding);
+    if (candidate.length === expected.length && timingSafeEqual(expected, candidate)) {
+      return true;
+    }
   }
-  if (a.length !== b.length || a.length === 0) return false;
-  return timingSafeEqual(a, b);
+  return false;
 }

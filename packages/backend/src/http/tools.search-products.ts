@@ -8,22 +8,29 @@ import type { AppDeps } from "./deps.js";
 /**
  * POST /v1/tools/search-products (PLAN §7.4). The Speechify `search_products`
  * webhook tool. Guardrails enforced here:
- *  - HMAC-verify the raw body before any work (§11.10).
+ *  - HMAC-verify before any work (§11.10): signed payload is `${timestamp}.${body}`.
  *  - Resolve category/scope server-side from the conversation id — the LLM
  *    never passes scope (§11.4); its `saved_catalog_slug` is a hard filter.
  *  - Return at most 3 results (§11.7).
  *  - UTM-tag every checkout URL server-side (§11.9).
+ *
+ * Envelope shape (confirmed from the Speechify console probe):
+ *   { tool_name, tool_call_id, timestamp, arguments: { ...LLM params } }
+ * The LLM fills `arguments`; `conversation_id` is envelope-level, not an
+ * LLM-controlled field. NOTE: the connection-test probe does not carry a
+ * conversation_id; the exact location/name on a *live* tool call is still to be
+ * confirmed against a real session — adjust `requestSchema` if it differs.
  */
 
 const SIGNATURE_HEADER = "x-speechify-signature";
+const TIMESTAMP_HEADER = "x-speechify-timestamp";
+const TEST_HEADER = "x-speechify-webhook-test";
 const DEFAULT_SHIPS_TO = "ZA";
 const RESULT_LIMIT = 3;
 
-// Speechify-side webhook envelope. The LLM fills `args`; `conversation_id` is
-// part of the signed envelope, not an LLM-controlled field.
 const requestSchema = z.object({
   conversation_id: z.string().min(1),
-  args: z.object({
+  arguments: z.object({
     query: z.string().min(1),
     max_price: z.number().positive().optional(),
     color: z.string().min(1).optional(),
@@ -35,14 +42,20 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
   const app = new Hono();
 
   app.post("/", async (c) => {
-    // 1. HMAC over the exact raw body, before parsing anything.
+    // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything.
     const rawBody = await c.req.text();
     const ok = verifyHmacSignature({
       rawBody,
       signature: c.req.header(SIGNATURE_HEADER),
-      secret: deps.webhookHmacSecret,
+      secret: deps.toolHmacSecret,
+      timestamp: c.req.header(TIMESTAMP_HEADER),
     });
     if (!ok) return c.json({ error: "invalid_signature" }, 401);
+
+    // 2. Connection-test probe: signature verified, no work to do.
+    if (c.req.header(TEST_HEADER)) {
+      return c.json({ ok: true }, 200);
+    }
 
     let json: unknown;
     try {
@@ -52,13 +65,14 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
     }
     const parsed = requestSchema.safeParse(json);
     if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
-    const { conversation_id, args } = parsed.data;
+    const { conversation_id } = parsed.data;
+    const args = parsed.data.arguments;
 
-    // 2. Resolve scope server-side from the (signed) conversation id.
+    // 3. Resolve scope server-side from the conversation id.
     const scope = await deps.repo.findScopeByConversationId(conversation_id);
     if (!scope) return c.json({ error: "unknown_conversation" }, 404);
 
-    // 3. Search the catalog within the resolved boundary.
+    // 4. Search the catalog within the resolved boundary.
     const query = args.color ? `${args.color} ${args.query}` : args.query;
     const results = await deps.catalog.search({
       query,
@@ -69,7 +83,7 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       limit: RESULT_LIMIT,
     });
 
-    // 4. Cap to 3 (defensive) and UTM-tag each checkout URL.
+    // 5. Cap to 3 (defensive) and UTM-tag each checkout URL.
     const products: ProductResult[] = results.slice(0, RESULT_LIMIT).map((p) => {
       const { url } = tagCheckoutUrl(p.checkoutUrl, {
         source: deps.utmSource,
