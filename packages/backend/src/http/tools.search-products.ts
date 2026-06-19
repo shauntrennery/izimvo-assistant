@@ -124,16 +124,24 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       return c.json({ error: "unknown_conversation" }, 404);
     }
 
-    // 4. Search the catalog within the resolved boundary.
+    // 4. Search the catalog within the resolved boundary. A catalog failure
+    // degrades to an empty result (the agent asks a clarifying question) rather
+    // than a 500 the agent reads aloud as "the catalogue is down".
     const query = args.color ? `${args.color} ${args.query}` : args.query;
-    const results = await deps.catalog.search({
-      query,
-      savedCatalogSlug: scope.savedCatalogSlug ?? undefined,
-      maxPriceMinor: args.max_price !== undefined ? Math.round(args.max_price * 100) : undefined,
-      shipsTo: args.ships_to ?? DEFAULT_SHIPS_TO,
-      optionPreferences: args.color ? ["Color"] : undefined,
-      limit: RESULT_LIMIT,
-    });
+    let results;
+    try {
+      results = await deps.catalog.search({
+        query,
+        savedCatalogSlug: scope.savedCatalogSlug ?? undefined,
+        maxPriceMinor: args.max_price !== undefined ? Math.round(args.max_price * 100) : undefined,
+        shipsTo: args.ships_to ?? DEFAULT_SHIPS_TO,
+        optionPreferences: args.color ? ["Color"] : undefined,
+        limit: RESULT_LIMIT,
+      });
+    } catch (e) {
+      cap.outcome = `500 catalog_error: ${e instanceof Error ? e.message : String(e)}`;
+      return c.json({ products: [] });
+    }
 
     // 5. Cap to 3 (defensive) and UTM-tag each checkout URL.
     const products: ProductResult[] = results.slice(0, RESULT_LIMIT).map((p) => {
