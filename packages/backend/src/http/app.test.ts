@@ -37,3 +37,22 @@ describe("GET /v1/loader.js", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("hosted demo", () => {
+  it("serves /demo as HTML and redirects / to it", async () => {
+    const { app } = buildApp({ demoHtml: "<!doctype html><title>demo</title>" });
+    const demo = await app.request("/demo");
+    expect(demo.status).toBe(200);
+    expect(demo.headers.get("content-type")).toContain("text/html");
+    expect(await demo.text()).toContain("demo");
+
+    const root = await app.request("/", { redirect: "manual" });
+    expect([301, 302]).toContain(root.status);
+    expect(root.headers.get("location")).toBe("/demo");
+  });
+
+  it("404s /demo when no demo html is configured", async () => {
+    const { app } = buildApp();
+    expect((await app.request("/demo")).status).toBe(404);
+  });
+});

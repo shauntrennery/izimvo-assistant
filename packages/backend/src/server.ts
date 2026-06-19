@@ -34,6 +34,13 @@ function readLoaderBundle(): { js: string; map: string | null } | undefined {
   };
 }
 
+/** Read the example storefront HTML (sibling package) to serve at /demo. */
+function readDemoHtml(): string | undefined {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const path = resolve(here, "../../loader/examples/host.html");
+  return existsSync(path) ? readFileSync(path, "utf8") : undefined;
+}
+
 const jwt = createJwtCache({
   tokenUrl: env.SHOPIFY_CATALOG_TOKEN_URL,
   clientId: env.SHOPIFY_CATALOG_CLIENT_ID,
@@ -57,6 +64,7 @@ const app = createApp({
   utmSource: env.ATTRIBUTION_UTM_SOURCE,
   sessionIpRateLimitPerMin: 30,
   loaderBundle: readLoaderBundle(),
+  demoHtml: readDemoHtml(),
 });
 
 // Bind 0.0.0.0 so the platform (Railway) can route to the container; PORT is

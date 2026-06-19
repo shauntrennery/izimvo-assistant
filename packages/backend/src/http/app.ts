@@ -52,6 +52,17 @@ export function createApp(deps: AppDeps): Hono {
     }
   }
 
+  // Hosted demo storefront (same origin as the loader, so it mints sessions
+  // against this backend — its host must be in the demo key's allowed_domains).
+  if (deps.demoHtml) {
+    const html = deps.demoHtml;
+    app.get("/", (c) => c.redirect("/demo"));
+    app.get("/demo", (c) => {
+      c.header("content-type", "text/html; charset=utf-8");
+      return c.body(html);
+    });
+  }
+
   return app;
 }
 

@@ -22,4 +22,6 @@ export interface AppDeps {
   sessionIpRateLimitPerMin: number;
   /** Built loader bundle to serve at /v1/loader.js; omitted in tests/when absent. */
   loaderBundle?: { js: string; map: string | null };
+  /** Example storefront HTML to serve at /demo; omitted in tests/when absent. */
+  demoHtml?: string;
 }

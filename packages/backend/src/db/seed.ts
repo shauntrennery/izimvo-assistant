@@ -28,7 +28,13 @@ async function main() {
   await db.insert(apiKeys).values({
     siteId,
     publicKey: "pk_live_demo",
-    allowedDomains: ["shop.example.com", "www.example.com", "localhost"],
+    allowedDomains: [
+      "shop.example.com",
+      "www.example.com",
+      "localhost",
+      // the hosted demo storefront runs on the backend's own origin
+      "izimvo-backend-production.up.railway.app",
+    ],
     rateLimitRpm: 60,
   });
 
