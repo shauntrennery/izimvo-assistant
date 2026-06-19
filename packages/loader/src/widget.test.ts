@@ -34,9 +34,10 @@ describe("createWidget", () => {
     expect(orb.textContent).toContain("Listening");
   });
 
-  it("renders product cards with formatted price and opens checkout on click", () => {
+  it("renders product cards with formatted price; click opens + beacons checkout", () => {
     const openUrl = vi.fn();
-    const w = createWidget({ reducedMotion: true, openUrl });
+    const onCheckout = vi.fn();
+    const w = createWidget({ reducedMotion: true, openUrl, onCheckout });
     w.showCards(items);
     const shadow = getShadow()!;
     const cards = shadow.querySelectorAll(".card");
@@ -47,6 +48,7 @@ describe("createWidget", () => {
 
     (shadow.querySelector(".card button") as HTMLButtonElement).click();
     expect(openUrl).toHaveBeenCalledWith("https://m.test/p1?utm_source=izimvo");
+    expect(onCheckout).toHaveBeenCalledWith("https://m.test/p1?utm_source=izimvo");
   });
 
   it("invokes the activate callback on orb tap", () => {

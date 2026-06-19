@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildUtm, tagUrl, tagCheckoutUrl } from "./attribution.js";
+import { buildUtm, extractUtm, tagUrl, tagCheckoutUrl } from "./attribution.js";
 
 const ctx = { source: "izimvo", categorySlug: "trail-running", sessionId: "sess_1" };
 
@@ -34,5 +34,22 @@ describe("attribution", () => {
     const { url, utm } = tagCheckoutUrl("https://shop.test/p", ctx);
     expect(url).toContain("utm_source=izimvo");
     expect(utm.utm_content).toBe("sess_1");
+  });
+
+  it("extractUtm round-trips the session id and utm params back out", () => {
+    const { url } = tagCheckoutUrl("https://shop.test/p?variant=9", ctx);
+    const { sessionId, utm } = extractUtm(url);
+    expect(sessionId).toBe("sess_1");
+    expect(utm).toEqual({
+      utm_source: "izimvo",
+      utm_medium: "voice",
+      utm_campaign: "trail-running",
+      utm_content: "sess_1",
+    });
+  });
+
+  it("extractUtm returns null sessionId for an untagged url", () => {
+    expect(extractUtm("https://shop.test/p").sessionId).toBeNull();
+    expect(extractUtm("garbage").sessionId).toBeNull();
   });
 });

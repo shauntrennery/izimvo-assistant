@@ -71,4 +71,10 @@ pnpm typecheck
   **3.3 KB gzip** (budget < 15 KB). Local test page:
   `packages/loader/examples/host.html`. The live voice loop additionally needs
   the Phase 0 Speechify agent + SDK wired into `loadRuntime`.
-- Phases 4–6: in progress per PLAN.md §10.
+- **Phase 4 — checkout handoff + attribution** ✅ `open_checkout` (and card
+  clicks) open the UTM-tagged URL and fire a `keepalive` beacon to
+  `POST /v1/checkout`; the backend re-derives the session from `utm_content`,
+  binds the request Origin to the session's origin, and persists the
+  `attributions` row with the precise UPID. Contract test: click-through carries
+  UTM + records a row; origin mismatch → 403.
+- Phases 5–6: in progress per PLAN.md §10.

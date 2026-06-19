@@ -24,6 +24,7 @@ export interface Repo {
   createSession(input: NewSession): Promise<{ id: string }>;
   recordUsageEvent(input: NewUsageEvent): Promise<void>;
   findSessionByConversationId(conversationId: string): Promise<{ id: string; siteId: string } | null>;
+  findSessionById(sessionId: string): Promise<{ id: string; siteId: string; origin: string } | null>;
   /** Read model for the search tool: resolve scope from a conversation id (PLAN §7.4). */
   findScopeByConversationId(conversationId: string): Promise<SearchScope | null>;
   setSessionConversationId(sessionId: string, conversationId: string): Promise<void>;
@@ -122,6 +123,15 @@ export function createRepo(db: Db): Repo {
         })
         .returning({ id: sessions.id });
       return { id: row!.id };
+    },
+
+    async findSessionById(sessionId) {
+      const [row] = await db
+        .select({ id: sessions.id, siteId: sessions.siteId, origin: sessions.origin })
+        .from(sessions)
+        .where(eq(sessions.id, sessionId))
+        .limit(1);
+      return row ?? null;
     },
 
     async findScopeByConversationId(conversationId) {

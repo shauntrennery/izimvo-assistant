@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { boot } from "./loader.js";
 import { createCart } from "./cart.js";
+import { createCheckoutReporter } from "./checkout.js";
 import type { AgentHandle, AgentRuntime } from "./runtime.js";
 import type { OrbStatus } from "./types.js";
 import type { Widget } from "./widget.js";
@@ -50,6 +51,7 @@ function harness() {
     widget,
     cart,
     audio,
+    checkout: createCheckoutReporter({ apiBase: "https://api.test", fetchImpl: vi.fn() as unknown as typeof fetch }),
     loadRuntime: async () => runtime,
     fetchImpl: fetchImpl as unknown as typeof fetch,
   });
@@ -105,6 +107,7 @@ describe("boot", () => {
       widget,
       cart: createCart(),
       audio,
+      checkout: createCheckoutReporter({ apiBase: "https://api.test", fetchImpl: vi.fn() as unknown as typeof fetch }),
       loadRuntime: async () => ({ startAgent: vi.fn() }) as unknown as AgentRuntime,
       fetchImpl: (async () => new Response("forbidden", { status: 403 })) as unknown as typeof fetch,
     });

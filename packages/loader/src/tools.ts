@@ -1,4 +1,5 @@
 import type { Cart } from "./cart.js";
+import type { CheckoutReporter } from "./checkout.js";
 import type { AgentHandle } from "./runtime.js";
 import type { ProductResult } from "./types.js";
 import type { Widget } from "./widget.js";
@@ -32,11 +33,14 @@ function parseItems(args: unknown): ProductResult[] {
 export interface ToolDeps {
   widget: Widget;
   cart: Cart;
+  checkout: CheckoutReporter;
 }
 
 export function registerClientTools(handle: AgentHandle, deps: ToolDeps): void {
   handle.registerTool("render_products", (args) => {
-    deps.widget.showCards(parseItems(args));
+    const items = parseItems(args);
+    deps.checkout.index(items);
+    deps.widget.showCards(items);
   });
 
   handle.registerTool("update_cart", (args) => {
@@ -53,6 +57,7 @@ export function registerClientTools(handle: AgentHandle, deps: ToolDeps): void {
     // Only open same-safety http(s) URLs the backend already UTM-tagged.
     if (typeof url === "string" && /^https?:\/\//i.test(url)) {
       deps.widget.openCheckout(url);
+      deps.checkout.report(url);
     }
   });
 }

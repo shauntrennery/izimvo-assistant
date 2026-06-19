@@ -55,3 +55,25 @@ export function tagCheckoutUrl(rawUrl: string, ctx: UtmContext): { url: string; 
   const utm = buildUtm(ctx);
   return { url: tagUrl(rawUrl, utm), utm };
 }
+
+/**
+ * Reverse of tagging: pull the utm_* params back off a checkout URL the loader
+ * reports. `utm_content` carries our session id, which is how a browser-side
+ * checkout click is re-attributed server-side without the browser ever holding
+ * our internal session identity.
+ */
+export function extractUtm(rawUrl: string): {
+  sessionId: string | null;
+  utm: Record<string, string>;
+} {
+  try {
+    const u = new URL(rawUrl);
+    const utm: Record<string, string> = {};
+    for (const [k, v] of u.searchParams) {
+      if (k.startsWith("utm_")) utm[k] = v;
+    }
+    return { sessionId: utm.utm_content ?? null, utm };
+  } catch {
+    return { sessionId: null, utm: {} };
+  }
+}

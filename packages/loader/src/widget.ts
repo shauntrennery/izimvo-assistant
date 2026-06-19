@@ -20,6 +20,8 @@ export interface WidgetOptions {
   doc?: Document;
   /** Injectable so tests can assert without a real popup; defaults to window.open. */
   openUrl?: (url: string) => void;
+  /** Invoked when the user pursues a checkout from a card (attribution beacon). */
+  onCheckout?: (url: string) => void;
   reducedMotion?: boolean;
 }
 
@@ -155,7 +157,10 @@ export function createWidget(opts: WidgetOptions = {}): Widget {
         const buy = doc.createElement("button");
         buy.type = "button";
         buy.textContent = "View";
-        buy.addEventListener("click", () => openUrl(item.checkoutUrl));
+        buy.addEventListener("click", () => {
+          openUrl(item.checkoutUrl);
+          opts.onCheckout?.(item.checkoutUrl);
+        });
 
         card.append(meta, buy);
         cards.appendChild(card);

@@ -76,6 +76,10 @@ export function createFakeRepo(data: FakeData): FakeRepo {
       const s = sessions.find((s) => s.conversationId === conversationId);
       return s ? { id: s.id, siteId: s.siteId } : null;
     },
+    async findSessionById(sessionId) {
+      const s = sessions.find((s) => s.id === sessionId);
+      return s ? { id: s.id, siteId: s.siteId, origin: s.origin } : null;
+    },
     async setSessionConversationId(sessionId, conversationId) {
       const s = sessions.find((s) => s.id === sessionId);
       if (s) s.conversationId = conversationId;

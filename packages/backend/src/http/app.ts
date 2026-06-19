@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppDeps } from "./deps.js";
+import { checkoutRoutes } from "./checkout.js";
 import { searchProductsRoutes } from "./tools.search-products.js";
 import { sessionRoutes } from "./session.js";
 
@@ -14,6 +15,7 @@ export function createApp(deps: AppDeps): Hono {
 
   app.route("/v1/session", sessionRoutes(deps));
   app.route("/v1/tools/search-products", searchProductsRoutes(deps));
+  app.route("/v1/checkout", checkoutRoutes(deps));
 
   return app;
 }

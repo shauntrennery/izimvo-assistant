@@ -1,5 +1,6 @@
 import { parseConfig } from "./attributes.js";
 import { createCart, type Cart } from "./cart.js";
+import { createCheckoutReporter, type CheckoutReporter } from "./checkout.js";
 import { createAudioGate, type AudioGate } from "./mic.js";
 import { type AgentRuntime } from "./runtime.js";
 import { fetchSession } from "./session.js";
@@ -30,6 +31,7 @@ export interface BootDeps {
   widget: Widget;
   cart: Cart;
   audio: AudioGate;
+  checkout: CheckoutReporter;
   loadRuntime: () => Promise<AgentRuntime>;
   fetchImpl?: typeof fetch;
 }
@@ -59,7 +61,11 @@ export function boot(deps: BootDeps): void {
         sessionUrl: session.sessionUrl,
       });
 
-      registerClientTools(handle, { widget: deps.widget, cart: deps.cart });
+      registerClientTools(handle, {
+        widget: deps.widget,
+        cart: deps.cart,
+        checkout: deps.checkout,
+      });
 
       handle.on("status", (status) => deps.widget.setStatus(status));
       handle.on("ended", () => {
@@ -88,14 +94,16 @@ function autoInit(scriptEl: HTMLScriptElement): void {
   if (!config) return; // no site-key → not our script / misconfigured; stay silent
 
   const apiBase = scriptEl.dataset.apiBase?.trim() || DEFAULT_API_BASE;
+  const checkout = createCheckoutReporter({ apiBase });
 
   boot({
     config,
     apiBase,
     pageUrl: location.href,
-    widget: createWidget(),
+    widget: createWidget({ onCheckout: (url) => checkout.report(url) }),
     cart: createCart(),
     audio: createAudioGate(),
+    checkout,
     loadRuntime: () =>
       Promise.reject(
         new Error(
