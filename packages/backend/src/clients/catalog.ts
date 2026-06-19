@@ -159,8 +159,9 @@ export function createGlobalCatalogClient(
       const parsed = searchStructured.safeParse(structured);
       if (!parsed.success) {
         // TEMP: include the raw structuredContent so we can see the prod shape.
+        const keys = structured && typeof structured === "object" ? Object.keys(structured) : [];
         throw new CatalogError(
-          `unexpected catalog search response: ${parsed.error.message} :: RAW=${JSON.stringify(structured).slice(0, 600)}`,
+          `unexpected catalog search response: keys=[${keys.join(",")}] RAW=${JSON.stringify(structured).slice(0, 3500)}`,
         );
       }
       return clusteredToResults(parsed.data.products.map(toClustered), {
