@@ -2,7 +2,7 @@ import { parseConfig } from "./attributes.js";
 import { createCart, type Cart } from "./cart.js";
 import { createCheckoutReporter, type CheckoutReporter } from "./checkout.js";
 import { createAudioGate, type AudioGate } from "./mic.js";
-import { type AgentRuntime } from "./runtime.js";
+import { loadSpeechifyRuntime, toOrbStatus, type AgentRuntime } from "./runtime.js";
 import { fetchSession } from "./session.js";
 import { registerClientTools } from "./tools.js";
 import type { LoaderConfig } from "./types.js";
@@ -59,6 +59,22 @@ export function boot(deps: BootDeps): void {
       const handle = await runtime.startAgent({
         sessionToken: session.sessionToken,
         sessionUrl: session.sessionUrl,
+        // The runtime drives the orb via status callbacks (idle→connecting→
+        // listening→thinking→speaking→ended); teardown on `ended`.
+        onStatus: (raw) => {
+          const status = toOrbStatus(raw);
+          deps.widget.setStatus(status);
+          if (status === "ended") {
+            deps.audio.teardown();
+            deps.cart.clear();
+            starting = false;
+          }
+        },
+        onError: () => {
+          deps.widget.setStatus("error");
+          deps.audio.teardown();
+          starting = false;
+        },
       });
 
       registerClientTools(handle, {
@@ -66,16 +82,6 @@ export function boot(deps: BootDeps): void {
         cart: deps.cart,
         checkout: deps.checkout,
       });
-
-      handle.on("status", (status) => deps.widget.setStatus(status));
-      handle.on("ended", () => {
-        deps.widget.setStatus("ended");
-        deps.audio.teardown();
-        deps.cart.clear();
-        starting = false;
-      });
-
-      deps.widget.setStatus("listening");
     } catch {
       deps.widget.setStatus("error");
       deps.audio.teardown();
@@ -104,12 +110,7 @@ function autoInit(scriptEl: HTMLScriptElement): void {
     cart: createCart(),
     audio: createAudioGate(),
     checkout,
-    loadRuntime: () =>
-      Promise.reject(
-        new Error(
-          "Izimvo: Speechify runtime not configured. Wire loadSpeechifyRuntime() to the SDK.",
-        ),
-      ),
+    loadRuntime: loadSpeechifyRuntime,
   });
 }
 

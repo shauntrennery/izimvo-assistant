@@ -12,8 +12,8 @@ function fakeHandle() {
   const tools = new Map<string, (a: unknown) => unknown>();
   const handle: AgentHandle = {
     registerTool: (name, h) => tools.set(name, h),
-    on: () => undefined,
-    end: () => undefined,
+    setMicEnabled: async () => undefined,
+    stop: async () => undefined,
   };
   return { handle, call: (n: string, a: unknown) => tools.get(n)?.(a) };
 }

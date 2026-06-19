@@ -23,15 +23,19 @@ function harness() {
     destroy: vi.fn(),
   };
 
-  const listeners: Record<string, (...a: unknown[]) => void> = {};
+  // Captures the onStatus callback passed to startAgent so the test can emit
+  // status transitions the way the real runtime does.
+  let onStatus: ((s: string) => void) | undefined;
   const handle = {
     registerTool: vi.fn(),
-    on: (event: string, cb: (...a: unknown[]) => void) => {
-      listeners[event] = cb;
-    },
-    end: vi.fn(),
+    setMicEnabled: vi.fn(async () => undefined),
+    stop: vi.fn(async () => undefined),
   } as unknown as AgentHandle;
-  const runtime: AgentRuntime = { startAgent: vi.fn(async () => handle) };
+  const startAgent = vi.fn(async (opts: { onStatus?: (s: string) => void }) => {
+    onStatus = opts.onStatus;
+    return handle;
+  });
+  const runtime: AgentRuntime = { startAgent: startAgent as unknown as AgentRuntime["startAgent"] };
 
   const audio = { ensure: vi.fn(async () => undefined), teardown: vi.fn() };
   const cart = createCart();
@@ -56,7 +60,16 @@ function harness() {
     fetchImpl: fetchImpl as unknown as typeof fetch,
   });
 
-  return { activate: () => activate?.(), statuses, handle, runtime, audio, cart, listeners, fetchImpl };
+  return {
+    activate: () => activate?.(),
+    statuses,
+    handle,
+    runtime,
+    audio,
+    cart,
+    fetchImpl,
+    emitStatus: (s: string) => onStatus?.(s),
+  };
 }
 
 describe("boot", () => {
@@ -66,12 +79,12 @@ describe("boot", () => {
 
     expect(h.audio.ensure).toHaveBeenCalledOnce();
     expect(h.fetchImpl).toHaveBeenCalledOnce();
-    expect(h.runtime.startAgent).toHaveBeenCalledWith({
-      sessionToken: "tok",
-      sessionUrl: "wss://rt.test/s",
-    });
+    expect(h.runtime.startAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionToken: "tok", sessionUrl: "wss://rt.test/s" }),
+    );
     expect(h.handle.registerTool).toHaveBeenCalledTimes(3);
-    expect(h.statuses).toEqual(["connecting", "listening"]);
+    // boot itself only sets "connecting"; the runtime drives the rest via onStatus
+    expect(h.statuses).toEqual(["connecting"]);
   });
 
   it("drives the orb from status events and tears down on ended", async () => {
@@ -79,10 +92,10 @@ describe("boot", () => {
     await h.activate();
     h.cart.set("u1", 1);
 
-    h.listeners.status?.("speaking");
+    h.emitStatus("speaking");
     expect(h.statuses.at(-1)).toBe("speaking");
 
-    h.listeners.ended?.();
+    h.emitStatus("ended");
     expect(h.statuses.at(-1)).toBe("ended");
     expect(h.audio.teardown).toHaveBeenCalled();
     expect(h.cart.entries()).toEqual([]);
