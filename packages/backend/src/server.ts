@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { createGlobalCatalogClient } from "./clients/catalog.js";
 import { createJwtCache } from "./clients/jwtCache.js";
@@ -14,6 +17,22 @@ import { createMemoryRateLimiter } from "./infra/rateLimiter.js";
  */
 loadDotEnv();
 const env = loadEnv();
+
+/** Read the built loader bundle (sibling package) to serve at /v1/loader.js. */
+function readLoaderBundle(): { js: string; map: string | null } | undefined {
+  const here = dirname(fileURLToPath(import.meta.url)); // packages/backend/src
+  const jsPath = resolve(here, "../../loader/dist/loader.global.js");
+  const mapPath = resolve(here, "../../loader/dist/loader.global.js.map");
+  if (!existsSync(jsPath)) {
+    // eslint-disable-next-line no-console
+    console.warn("loader bundle not found; /v1/loader.js disabled. Run the loader build.");
+    return undefined;
+  }
+  return {
+    js: readFileSync(jsPath, "utf8"),
+    map: existsSync(mapPath) ? readFileSync(mapPath, "utf8") : null,
+  };
+}
 
 const jwt = createJwtCache({
   tokenUrl: env.SHOPIFY_CATALOG_TOKEN_URL,
@@ -37,6 +56,7 @@ const app = createApp({
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,
   utmSource: env.ATTRIBUTION_UTM_SOURCE,
   sessionIpRateLimitPerMin: 30,
+  loaderBundle: readLoaderBundle(),
 });
 
 // Bind 0.0.0.0 so the platform (Railway) can route to the container; PORT is

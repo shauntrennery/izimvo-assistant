@@ -15,18 +15,17 @@
     <p>Tap the orb (bottom-right) to talk to the adviser.</p>
 
     <!--
-      The embed contract (PLAN §7.1). For local testing, data-api-base points the
-      loader at your backend; in production the base is baked into the bundle.
-      The Speechify runtime must be wired (Phase 0) for the live voice loop;
-      without it, the orb renders and a tap mints a session, then surfaces the
-      "runtime not configured" error state.
+      The embed contract (PLAN §7.1). The loader is served from our backend and
+      derives its API base from that origin, so no data-api-base is needed.
+      Serve this file from an allowlisted origin (the demo site-key allows
+      `localhost`, so `npx serve packages/loader/examples` works) — the browser
+      treats localhost as a secure context, which mic/audio require.
     -->
     <script
-      src="../dist/loader.global.js"
+      src="https://izimvo-backend-production.up.railway.app/v1/loader.js"
       data-site-key="pk_live_demo"
       data-category="trail-running"
       data-locale="en-ZA"
-      data-api-base="http://localhost:8787"
     ></script>
   </body>
 </html>

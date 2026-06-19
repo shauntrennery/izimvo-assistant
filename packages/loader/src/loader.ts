@@ -99,7 +99,10 @@ function autoInit(scriptEl: HTMLScriptElement): void {
   const config = parseConfig(scriptEl);
   if (!config) return; // no site-key → not our script / misconfigured; stay silent
 
-  const apiBase = scriptEl.dataset.apiBase?.trim() || DEFAULT_API_BASE;
+  // API base resolution order: explicit data-api-base → the origin the loader
+  // was served from (our backend serves /v1/loader.js, so it calls itself) →
+  // the build-time baked default.
+  const apiBase = scriptEl.dataset.apiBase?.trim() || scriptOrigin(scriptEl) || DEFAULT_API_BASE;
   const checkout = createCheckoutReporter({ apiBase });
 
   boot({
@@ -112,6 +115,15 @@ function autoInit(scriptEl: HTMLScriptElement): void {
     checkout,
     loadRuntime: loadSpeechifyRuntime,
   });
+}
+
+/** The origin the loader script was served from (e.g. our backend/CDN). */
+function scriptOrigin(el: HTMLScriptElement): string | null {
+  try {
+    return new URL(el.src).origin;
+  } catch {
+    return null;
+  }
 }
 
 // Capture currentScript synchronously at module eval, then defer DOM work.

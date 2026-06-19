@@ -20,4 +20,6 @@ export interface AppDeps {
   utmSource: string;
   /** Per-IP burst ceiling for /v1/session, independent of per-key rpm. */
   sessionIpRateLimitPerMin: number;
+  /** Built loader bundle to serve at /v1/loader.js; omitted in tests/when absent. */
+  loaderBundle?: { js: string; map: string | null };
 }
