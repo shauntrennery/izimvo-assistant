@@ -43,6 +43,7 @@ describe("POST /v1/session", () => {
     expect(json).toEqual({
       sessionToken: "tok_test_123",
       sessionUrl: "wss://realtime.speechify.test/session/abc",
+      conversationId: "conv_test_abc",
     });
     expect(repo.sessions).toHaveLength(1);
     expect(repo.sessions[0]).toMatchObject({

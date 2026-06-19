@@ -2,6 +2,7 @@ import { parseConfig } from "./attributes.js";
 import { createCart, type Cart } from "./cart.js";
 import { createCheckoutReporter, type CheckoutReporter } from "./checkout.js";
 import { createAudioGate, type AudioGate } from "./mic.js";
+import { createProductPoller, type ProductPoller } from "./products.js";
 import { loadSpeechifyRuntime, toOrbStatus, type AgentHandle, type AgentRuntime } from "./runtime.js";
 import { fetchSession } from "./session.js";
 import { registerClientTools } from "./tools.js";
@@ -38,11 +39,14 @@ export interface BootDeps {
 
 export function boot(deps: BootDeps): void {
   let handle: AgentHandle | null = null;
+  let poller: ProductPoller | null = null;
   let connecting = false;
 
   function teardown(): void {
     deps.audio.teardown();
     deps.cart.clear();
+    poller?.stop();
+    poller = null;
     handle = null;
     connecting = false;
   }
@@ -98,16 +102,22 @@ export function boot(deps: BootDeps): void {
         widget: deps.widget,
         cart: deps.cart,
         checkout: deps.checkout,
-        // TEMP wiring beacon — reports client-tool payloads to the backend.
-        report: (name, args) => {
-          void (deps.fetchImpl ?? fetch)(`${deps.apiBase}/v1/debug/tool-capture`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            keepalive: true,
-            body: JSON.stringify({ name, args }),
-          }).catch(() => undefined);
-        },
       });
+
+      // Render cards by polling backend search results — independent of the
+      // agent calling render_products.
+      if (session.conversationId) {
+        poller = createProductPoller({
+          apiBase: deps.apiBase,
+          conversationId: session.conversationId,
+          fetchImpl: deps.fetchImpl,
+          onProducts: (items) => {
+            deps.checkout.index(items);
+            deps.widget.showCards(items);
+          },
+        });
+        poller.start();
+      }
     } catch {
       deps.widget.setStatus("error");
       teardown();

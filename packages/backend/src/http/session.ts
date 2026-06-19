@@ -107,6 +107,8 @@ export function sessionRoutes(deps: AppDeps): Hono {
     return c.json({
       sessionToken: minted.sessionToken,
       sessionUrl: minted.sessionUrl,
+      // The browser polls /v1/conversation-products with this to render cards.
+      conversationId: minted.conversationId,
     });
   });
 

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { listToolCaptures, pushToolCapture } from "../infra/toolCapture.js";
+import { getConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
 import { checkoutRoutes } from "./checkout.js";
 import { searchProductsRoutes } from "./tools.search-products.js";
@@ -29,6 +29,13 @@ export function createApp(deps: AppDeps): Hono {
   );
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  // Loader polls this to render product cards for its conversation (cid is the
+  // unguessable conversation UUID; results are non-sensitive product data).
+  app.get("/v1/conversation-products", (c) => {
+    const cid = c.req.query("cid");
+    return c.json({ products: cid ? getConversationProducts(cid) : [] });
+  });
 
   app.route("/v1/session", sessionRoutes(deps));
   app.route("/v1/tools/search-products", searchProductsRoutes(deps));
@@ -71,20 +78,6 @@ export function createApp(deps: AppDeps): Hono {
       return c.body(html);
     });
   }
-
-  // TEMP (wiring): client-tool beacon from the loader, to confirm the agent's
-  // render_products dispatch + payload. Remove once card-render is confirmed.
-  app.post("/v1/debug/tool-capture", async (c) => {
-    const b = (await c.req.json().catch(() => null)) as { name?: unknown; args?: unknown } | null;
-    if (b && typeof b === "object") {
-      pushToolCapture({ ts: Date.now(), name: String(b.name ?? ""), args: b.args });
-    }
-    return c.body(null, 204);
-  });
-  app.get("/v1/debug/tool-capture", (c) => {
-    if (c.req.query("token") !== deps.toolHmacSecret) return c.json({ error: "forbidden" }, 403);
-    return c.json({ captures: listToolCaptures() });
-  });
 
   return app;
 }

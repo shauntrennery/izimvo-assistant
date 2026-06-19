@@ -8,6 +8,8 @@ import type { LoaderConfig } from "./types.js";
 export interface SessionResponse {
   sessionToken: string;
   sessionUrl: string;
+  /** Conversation id used to poll for product cards. */
+  conversationId: string | null;
 }
 
 export class SessionError extends Error {
@@ -47,5 +49,9 @@ export async function fetchSession(opts: {
   if (!json.sessionToken || !json.sessionUrl) {
     throw new SessionError("malformed session response");
   }
-  return { sessionToken: json.sessionToken, sessionUrl: json.sessionUrl };
+  return {
+    sessionToken: json.sessionToken,
+    sessionUrl: json.sessionUrl,
+    conversationId: json.conversationId ?? null,
+  };
 }

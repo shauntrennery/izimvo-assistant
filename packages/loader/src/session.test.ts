@@ -27,7 +27,7 @@ describe("fetchSession", () => {
       pageUrl: "https://host.test/p",
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
-    expect(out).toEqual({ sessionToken: "tok", sessionUrl: "wss://rt.test/s" });
+    expect(out).toEqual({ sessionToken: "tok", sessionUrl: "wss://rt.test/s", conversationId: null });
   });
 
   it("throws SessionError on 403 (non-allowlisted origin)", async () => {

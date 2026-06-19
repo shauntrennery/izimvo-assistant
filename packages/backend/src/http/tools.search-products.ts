@@ -3,6 +3,7 @@ import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
 import type { ProductResult } from "../core/products.js";
+import { putConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
 
 /**
@@ -133,6 +134,10 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       });
       return { ...p, checkoutUrl: url };
     });
+
+    // Stash for the loader to render via polling (the agent's render_products
+    // client-tool dispatch is unreliable; this keeps cards independent of it).
+    putConversationProducts(conversationId, products);
 
     // Record the tool call for billing/usage (best-effort; never blocks search).
     void deps.repo

@@ -43,13 +43,10 @@ export interface ToolDeps {
   widget: Widget;
   cart: Cart;
   checkout: CheckoutReporter;
-  /** TEMP wiring beacon: reports each client-tool invocation's raw args. */
-  report?: (name: string, args: unknown) => void;
 }
 
 export function registerClientTools(handle: AgentHandle, deps: ToolDeps): void {
   handle.registerTool("render_products", (args) => {
-    deps.report?.("render_products", args);
     const items = parseItems(args);
     deps.checkout.index(items);
     deps.widget.showCards(items);

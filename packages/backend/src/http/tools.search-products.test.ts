@@ -114,6 +114,15 @@ describe("POST /v1/tools/search-products", () => {
     expect(ctx.repo.usage.some((u) => u.kind === "tool_call")).toBe(true);
   });
 
+  it("stashes results for the conversation, readable via /v1/conversation-products", async () => {
+    await post(validBody);
+    const res = await ctx.app.request(`/v1/conversation-products?cid=${CONV_ID}`);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { products: ProductResult[] };
+    expect(json.products).toHaveLength(3);
+    expect(json.products[0]?.checkoutUrl).toContain("utm_source=izimvo");
+  });
+
   it("acks the connection-test probe with 200 and does no work", async () => {
     const body = { tool_name: "connection_test", arguments: {}, timestamp: Number(TS) };
     const res = await post(body, { extraHeaders: { "x-speechify-webhook-test": "true" } });
