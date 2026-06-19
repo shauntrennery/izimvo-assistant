@@ -28,7 +28,10 @@ const app = createApp({
     agentId: env.SPEECHIFY_AGENT_ID,
     baseUrl: env.SPEECHIFY_API_BASE,
   }),
-  catalog: createGlobalCatalogClient({ mcpUrl: env.SHOPIFY_CATALOG_MCP_URL }, jwt),
+  catalog: createGlobalCatalogClient(
+    { mcpUrl: env.SHOPIFY_CATALOG_MCP_URL, agentProfileUrl: env.SHOPIFY_UCP_AGENT_PROFILE },
+    jwt,
+  ),
   rateLimiter: createMemoryRateLimiter(),
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,

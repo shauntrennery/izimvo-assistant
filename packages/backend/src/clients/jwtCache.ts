@@ -1,20 +1,18 @@
 import { z } from "zod";
 
 /**
- * Shopify Catalog client-credentials JWT cache (Guardrail §11.5). The token is
- * minted server-to-server and reused across requests — never minted per
- * request. Refreshed a margin before expiry so an in-flight search never races
- * an expiring token.
+ * Shopify Catalog client-credentials JWT cache (Guardrail §11.5). Confirmed
+ * against the live api.shopify.com/auth/access_token endpoint: the request is a
+ * JSON body, and the response is `{ access_token, token_type }` with NO
+ * `expires_in` — the access_token is itself a JWT, so the TTL is read from its
+ * `exp` claim (≈60 min). Minted server-to-server and reused; never per request.
  */
 
-const tokenResponseSchema = z.object({
-  access_token: z.string().min(1),
-  // seconds; the spec says ~60 min. Default if the provider omits it.
-  expires_in: z.number().positive().default(3600),
-});
+const tokenResponseSchema = z
+  .object({ access_token: z.string().min(1) })
+  .passthrough();
 
 export interface JwtProvider {
-  /** Returns a currently-valid bearer token, minting/refreshing as needed. */
   getToken(): Promise<string>;
 }
 
@@ -31,6 +29,21 @@ interface CachedToken {
 
 // Refresh this long before the real expiry to avoid edge races.
 const REFRESH_MARGIN_MS = 60_000;
+// Used only if the token isn't a decodable JWT (defensive — it always is here).
+const FALLBACK_TTL_MS = 55 * 60_000;
+
+/** Read the `exp` (epoch seconds) claim from a JWT without verifying it. */
+function jwtExpiryMs(token: string): number | null {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const claims: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    const exp = (claims as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
 
 export function createJwtCache(
   config: JwtCacheConfig,
@@ -45,20 +58,20 @@ export function createJwtCache(
   async function mint(): Promise<string> {
     const res = await fetchImpl(config.tokenUrl, {
       method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
         client_id: config.clientId,
         client_secret: config.clientSecret,
-      }).toString(),
+        grant_type: "client_credentials",
+      }),
     });
     if (!res.ok) {
       throw new Error(`catalog token mint failed: ${res.status}`);
     }
-    const parsed = tokenResponseSchema.parse(await res.json());
+    const { access_token } = tokenResponseSchema.parse(await res.json());
     cached = {
-      token: parsed.access_token,
-      expiresAtMs: now() + parsed.expires_in * 1000,
+      token: access_token,
+      expiresAtMs: jwtExpiryMs(access_token) ?? now() + FALLBACK_TTL_MS,
     };
     return cached.token;
   }
@@ -68,7 +81,6 @@ export function createJwtCache(
       if (cached && now() < cached.expiresAtMs - REFRESH_MARGIN_MS) {
         return cached.token;
       }
-      // Coalesce concurrent refreshes into a single mint.
       if (!inflight) {
         inflight = mint().finally(() => {
           inflight = null;

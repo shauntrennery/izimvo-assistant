@@ -18,6 +18,12 @@ const envSchema = z.object({
   SHOPIFY_CATALOG_CLIENT_SECRET: z.string().min(1),
   SHOPIFY_CATALOG_TOKEN_URL: z.string().url(),
   SHOPIFY_CATALOG_MCP_URL: z.string().url(),
+  // UCP agent profile sent on every catalog call. Defaults to Shopify's sample
+  // profile; host our own at /.well-known/ucp for production.
+  SHOPIFY_UCP_AGENT_PROFILE: z
+    .string()
+    .url()
+    .default("https://shopify.dev/ucp/agent-profiles/2026-04-08/valid-with-capabilities.json"),
 
   DATABASE_URL: z.string().min(1),
 
