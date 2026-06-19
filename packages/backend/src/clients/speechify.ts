@@ -20,6 +20,13 @@ export interface MintSessionInput {
 export interface MintedSession {
   sessionToken: string;
   sessionUrl: string;
+  /**
+   * The Speechify conversation id, when the mint response carries it. We store
+   * it so the signed search-tool webhook can be correlated back to this
+   * session's scope server-side (PLAN §7.4). Null if not yet known — Phase 5's
+   * post-call webhook is the fallback correlation point.
+   */
+  conversationId: string | null;
 }
 
 export interface SpeechifyClient {
@@ -31,6 +38,7 @@ export interface SpeechifyClient {
 const mintResponseSchema = z.object({
   sessionToken: z.string().min(1),
   sessionUrl: z.string().url(),
+  conversationId: z.string().min(1).optional(),
 });
 
 export interface SpeechifyConfig {
@@ -91,7 +99,11 @@ export function createSpeechifyClient(
           `unexpected session mint response: ${parsed.error.message}`,
         );
       }
-      return parsed.data;
+      return {
+        sessionToken: parsed.data.sessionToken,
+        sessionUrl: parsed.data.sessionUrl,
+        conversationId: parsed.data.conversationId ?? null,
+      };
     },
   };
 }

@@ -24,8 +24,17 @@ export interface Repo {
   createSession(input: NewSession): Promise<{ id: string }>;
   recordUsageEvent(input: NewUsageEvent): Promise<void>;
   findSessionByConversationId(conversationId: string): Promise<{ id: string; siteId: string } | null>;
+  /** Read model for the search tool: resolve scope from a conversation id (PLAN §7.4). */
+  findScopeByConversationId(conversationId: string): Promise<SearchScope | null>;
   setSessionConversationId(sessionId: string, conversationId: string): Promise<void>;
   recordAttribution(input: NewAttribution): Promise<void>;
+}
+
+export interface SearchScope {
+  sessionId: string;
+  siteId: string;
+  categorySlug: string;
+  savedCatalogSlug: string | null;
 }
 
 export interface NewSession {
@@ -33,6 +42,7 @@ export interface NewSession {
   categorySlug: string;
   userIdentity: string | null;
   origin: string;
+  conversationId: string | null;
 }
 
 export interface NewUsageEvent {
@@ -108,9 +118,31 @@ export function createRepo(db: Db): Repo {
           categorySlug: input.categorySlug,
           userIdentity: input.userIdentity,
           origin: input.origin,
+          speechifyConversationId: input.conversationId,
         })
         .returning({ id: sessions.id });
       return { id: row!.id };
+    },
+
+    async findScopeByConversationId(conversationId) {
+      const [row] = await db
+        .select({
+          sessionId: sessions.id,
+          siteId: sessions.siteId,
+          categorySlug: sessions.categorySlug,
+          savedCatalogSlug: categories.savedCatalogSlug,
+        })
+        .from(sessions)
+        .innerJoin(
+          categories,
+          and(
+            eq(categories.siteId, sessions.siteId),
+            eq(categories.slug, sessions.categorySlug),
+          ),
+        )
+        .where(eq(sessions.speechifyConversationId, conversationId))
+        .limit(1);
+      return row ?? null;
     },
 
     async recordUsageEvent(input) {

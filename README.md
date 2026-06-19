@@ -58,4 +58,9 @@ pnpm typecheck
   site-key validation, exact-hostname domain binding, per-key + per-IP rate
   limiting, server-side category resolution, Speechify mint, persistence.
   Contract test: allowlisted origin → token; non-allowlisted → 403.
-- Phases 2–6: in progress per PLAN.md §10.
+- **Phase 2 — catalog bridge + search tool** ✅ `jwtCache` (client-credentials,
+  60-min TTL, coalesced refresh), `CatalogClient` Global impl behind the swap
+  interface, `POST /v1/tools/search-products` with HMAC verify, server-side
+  scope resolution from the conversation id, ≤3 results, UTM-tagged checkout
+  URLs. Contract test: signed → ≤3 tagged products; unsigned → 401.
+- Phases 3–6: in progress per PLAN.md §10.

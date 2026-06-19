@@ -1,5 +1,11 @@
 import type { MintSessionInput, SpeechifyClient } from "../clients/speechify.js";
 import type { Category } from "../core/category.js";
+import type {
+  CatalogClient,
+  CatalogSearchInput,
+  ProductDetail,
+  ProductResult,
+} from "../core/products.js";
 import type { ApiKey, Site } from "../core/siteKeys.js";
 import type {
   NewAttribution,
@@ -47,8 +53,21 @@ export function createFakeRepo(data: FakeData): FakeRepo {
     },
     async createSession(input) {
       const id = `sess_${++counter}`;
-      sessions.push({ ...input, id, conversationId: null });
+      sessions.push({ ...input, id, conversationId: input.conversationId });
       return { id };
+    },
+    async findScopeByConversationId(conversationId) {
+      const s = sessions.find((s) => s.conversationId === conversationId);
+      if (!s) return null;
+      const cat = data.categories.find(
+        (c) => c.siteId === s.siteId && c.slug === s.categorySlug,
+      );
+      return {
+        sessionId: s.id,
+        siteId: s.siteId,
+        categorySlug: s.categorySlug,
+        savedCatalogSlug: cat?.savedCatalogSlug ?? null,
+      };
     },
     async recordUsageEvent(input) {
       usage.push(input);
@@ -67,6 +86,27 @@ export function createFakeRepo(data: FakeData): FakeRepo {
   };
 }
 
+export interface FakeCatalog extends CatalogClient {
+  lastInput: CatalogSearchInput | null;
+}
+
+/** Returns the provided results verbatim; records the last search input. */
+export function createFakeCatalog(results: ProductResult[] = []): FakeCatalog {
+  const self: FakeCatalog = {
+    lastInput: null,
+    async search(input) {
+      self.lastInput = input;
+      return results.slice(0, input.limit);
+    },
+    async getProduct(upid): Promise<ProductDetail> {
+      const found = results.find((r) => r.upid === upid);
+      if (!found) throw new Error(`no such product ${upid}`);
+      return found;
+    },
+  };
+  return self;
+}
+
 export function createFakeSpeechify(
   onMint?: (input: MintSessionInput) => void,
 ): SpeechifyClient {
@@ -76,6 +116,7 @@ export function createFakeSpeechify(
       return {
         sessionToken: "tok_test_123",
         sessionUrl: "wss://realtime.speechify.test/session/abc",
+        conversationId: "conv_test_abc",
       };
     },
   };

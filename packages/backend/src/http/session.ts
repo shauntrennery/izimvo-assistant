@@ -91,6 +91,7 @@ export function sessionRoutes(deps: AppDeps): Hono {
       categorySlug: resolved.value.slug,
       userIdentity: req.userIdentity ?? null,
       origin,
+      conversationId: minted.conversationId,
     });
 
     return c.json({

@@ -39,7 +39,11 @@ describe("createSpeechifyClient.mintSession", () => {
       locale: "en-ZA",
       userIdentity: null,
     });
-    expect(minted).toEqual({ sessionToken: "tok", sessionUrl: "wss://rt.test/s/1" });
+    expect(minted).toEqual({
+      sessionToken: "tok",
+      sessionUrl: "wss://rt.test/s/1",
+      conversationId: null,
+    });
   });
 
   it("throws SpeechifyError on a non-2xx response", async () => {

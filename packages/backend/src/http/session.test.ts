@@ -1,28 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createMemoryRateLimiter } from "../infra/rateLimiter.js";
 import { createFakeRepo, createFakeSpeechify, type FakeRepo } from "../test/fakes.js";
 import { seedData } from "../test/fixtures.js";
-import { createApp } from "./app.js";
-import type { AppDeps } from "./deps.js";
+import { buildApp as makeApp } from "../test/buildApp.js";
+import type { createApp } from "./app.js";
 
 /**
  * Contract test for POST /v1/session (PLAN §10 Phase 1 acceptance):
  *   allowlisted origin → token;  non-allowlisted origin → 403.
  * Plus the negative auth paths CLAUDE.md requires as first-class tests.
  */
-
-function makeApp(overrides: Partial<AppDeps> = {}) {
-  const repo: FakeRepo = createFakeRepo(seedData());
-  const deps: AppDeps = {
-    repo,
-    speechify: createFakeSpeechify(),
-    rateLimiter: createMemoryRateLimiter(),
-    webhookHmacSecret: "whsec_test",
-    sessionIpRateLimitPerMin: 30,
-    ...overrides,
-  };
-  return { app: createApp(deps), repo, deps };
-}
 
 function post(
   app: ReturnType<typeof createApp>,
