@@ -64,10 +64,20 @@
         height: 720px;
         z-index: 0;
         color: var(--pine);
-        opacity: 0.10;
+        opacity: 0.14;
         pointer-events: none;
+        /* fill/stroke inherit into <use> clones — set here, not on `.topo path`,
+           which doesn't reach use-instance shadow content (the original bug). */
+        fill: none;
+        stroke: currentColor;
       }
-      .topo path { fill: none; stroke: currentColor; stroke-width: 1.4; }
+      .topo path,
+      .topo use {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.4;
+        vector-effect: non-scaling-stroke;
+      }
 
       .wrap {
         position: relative;
