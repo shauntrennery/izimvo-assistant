@@ -52,6 +52,22 @@ describe("createSpeechifyClient.mintSession", () => {
     });
   });
 
+  it("prefers the token metadata conversation UUID over conversation.id", async () => {
+    const meta = JSON.stringify({ conversation_id: "019edff1-d832-7b8d-85d1-ea47bc603649" });
+    const payload = Buffer.from(JSON.stringify({ metadata: meta })).toString("base64url");
+    const token = `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ token, url: "wss://rt.test/s", conversation: { id: "conv_abc" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    const client = createSpeechifyClient(config, fetchImpl as unknown as typeof fetch);
+    const minted = await client.mintSession({ category: "x", merchantScope: "global", locale: "en-ZA", userIdentity: null });
+    expect(minted.conversationId).toBe("019edff1-d832-7b8d-85d1-ea47bc603649");
+  });
+
   it("throws SpeechifyError on a non-2xx response", async () => {
     const fetchImpl = vi.fn(async () => new Response("nope", { status: 401 }));
     const client = createSpeechifyClient(config, fetchImpl as unknown as typeof fetch);

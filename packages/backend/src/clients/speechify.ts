@@ -106,10 +106,32 @@ export function createSpeechifyClient(
       return {
         sessionToken: parsed.data.token,
         sessionUrl: parsed.data.url,
-        conversationId: parsed.data.conversation?.id ?? null,
+        // The search-tool webhook receives `system__conversation_id`, which is
+        // the conversation UUID embedded in the session token's metadata — NOT
+        // the `conv_…` form on `conversation.id`. Store the UUID so the tool
+        // call (cid={{system__conversation_id}}) correlates back to this session.
+        conversationId:
+          conversationIdFromToken(parsed.data.token) ?? parsed.data.conversation?.id ?? null,
       };
     },
   };
+}
+
+/** Extract `metadata.conversation_id` (the conversation UUID) from a session token. */
+function conversationIdFromToken(token: string): string | null {
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(part, "base64url").toString("utf8")) as {
+      metadata?: unknown;
+    };
+    const meta =
+      typeof payload.metadata === "string" ? JSON.parse(payload.metadata) : payload.metadata;
+    const cid = (meta as { conversation_id?: unknown } | null)?.conversation_id;
+    return typeof cid === "string" ? cid : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
