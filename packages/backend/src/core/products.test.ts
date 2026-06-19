@@ -25,6 +25,25 @@ describe("selectBestOffer", () => {
     // C is cheapest but US-only.
     expect(selectBestOffer(offers, { shipsTo: "ZA" })?.merchant).not.toBe("C");
   });
+
+  it("prefers the buyer's currency over a numerically-cheaper other currency", () => {
+    const mixed = [
+      { merchant: "UK", priceMinor: 6583, currency: "GBP", checkoutUrl: "https://uk.test/p" },
+      { merchant: "ZA1", priceMinor: 250000, currency: "ZAR", checkoutUrl: "https://za1.test/p" },
+      { merchant: "ZA2", priceMinor: 230000, currency: "ZAR", checkoutUrl: "https://za2.test/p" },
+    ];
+    // Without a preference, the GBP one wins on raw number (the bug we fixed).
+    expect(selectBestOffer(mixed, {})?.merchant).toBe("UK");
+    // Preferring ZAR picks the cheapest ZAR offer, not the smaller GBP number.
+    const best = selectBestOffer(mixed, { preferCurrency: "ZAR" });
+    expect(best?.merchant).toBe("ZA2");
+    expect(best?.currency).toBe("ZAR");
+  });
+
+  it("falls back to other currencies when none match the preference", () => {
+    const onlyUsd = [{ merchant: "US", priceMinor: 14861, currency: "USD", checkoutUrl: "https://us.test/p" }];
+    expect(selectBestOffer(onlyUsd, { preferCurrency: "ZAR" })?.merchant).toBe("US");
+  });
 });
 
 describe("clusteredToResults", () => {

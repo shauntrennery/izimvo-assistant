@@ -31,6 +31,17 @@ const RESULT_LIMIT = 3;
 
 const CONVERSATION_HEADER = "x-speechify-conversation-id";
 
+// Buyer currency by ships-to country, so prices surface in the local currency.
+const COUNTRY_CURRENCY: Record<string, string> = {
+  ZA: "ZAR",
+  US: "USD",
+  GB: "GBP",
+  AU: "AUD",
+  CA: "CAD",
+  NZ: "NZD",
+  EU: "EUR",
+};
+
 const argsSchema = z.object({
   query: z.string().min(1),
   max_price: z.number().positive().optional(),
@@ -109,13 +120,15 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
     // degrades to an empty result (the agent asks a clarifying question) rather
     // than a 500 the agent reads aloud as "the catalogue is down".
     const query = args.color ? `${args.color} ${args.query}` : args.query;
+    const shipsTo = args.ships_to ?? DEFAULT_SHIPS_TO;
     let results;
     try {
       results = await deps.catalog.search({
         query,
         savedCatalogSlug: scope.savedCatalogSlug ?? undefined,
         maxPriceMinor: args.max_price !== undefined ? Math.round(args.max_price * 100) : undefined,
-        shipsTo: args.ships_to ?? DEFAULT_SHIPS_TO,
+        shipsTo,
+        currency: COUNTRY_CURRENCY[shipsTo.toUpperCase()],
         optionPreferences: args.color ? ["Color"] : undefined,
         limit: RESULT_LIMIT,
       });

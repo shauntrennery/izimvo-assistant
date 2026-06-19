@@ -24,6 +24,7 @@ export interface CatalogSearchInput {
   savedCatalogSlug?: string; // hard boundary filter, resolved server-side
   maxPriceMinor?: number;
   shipsTo?: string;
+  currency?: string; // buyer currency (e.g. ZAR) — preferred for pricing
   optionPreferences?: string[];
   limit: number; // always 3 (Guardrail §11.7)
 }
@@ -53,20 +54,35 @@ export interface ClusteredProduct {
   offers: CatalogOffer[];
 }
 
-/** Lowest-priced offer that ships to the requested country and is within budget. */
+/**
+ * Best offer for a product. Prefers the buyer's currency (so a ZA shopper sees
+ * a ZAR price, not a numerically-smaller GBP one), then applies the budget and
+ * ships-to filters, then picks the lowest price — only ever comparing prices
+ * within a single currency. Falls back to other currencies if none match.
+ */
 export function selectBestOffer(
   offers: CatalogOffer[],
-  filter: { maxPriceMinor?: number; shipsTo?: string },
+  filter: { maxPriceMinor?: number; shipsTo?: string; preferCurrency?: string },
 ): CatalogOffer | null {
-  const eligible = offers.filter((o) => {
-    if (filter.maxPriceMinor !== undefined && o.priceMinor > filter.maxPriceMinor) {
-      return false;
-    }
-    if (filter.shipsTo && o.shipsTo && !o.shipsTo.includes(filter.shipsTo)) {
-      return false;
-    }
-    return true;
-  });
+  const shipsOk = offers.filter(
+    (o) => !filter.shipsTo || !o.shipsTo || o.shipsTo.includes(filter.shipsTo),
+  );
+
+  // Prefer the buyer's currency when any offer is priced in it.
+  let pool = shipsOk;
+  if (filter.preferCurrency) {
+    const inCurrency = shipsOk.filter((o) => o.currency === filter.preferCurrency);
+    if (inCurrency.length > 0) pool = inCurrency;
+  }
+
+  // Budget is expressed in the buyer's currency; only enforce it within the
+  // preferred-currency pool (avoids comparing, say, a ZAR ceiling to USD).
+  const samePoolCurrency = pool.every((o) => o.currency === pool[0]?.currency);
+  const eligible =
+    filter.maxPriceMinor !== undefined && samePoolCurrency
+      ? pool.filter((o) => o.priceMinor <= filter.maxPriceMinor!)
+      : pool;
+
   if (eligible.length === 0) return null;
   return eligible.reduce((best, o) => (o.priceMinor < best.priceMinor ? o : best));
 }
@@ -78,7 +94,7 @@ export function selectBestOffer(
  */
 export function clusteredToResults(
   products: ClusteredProduct[],
-  input: { maxPriceMinor?: number; shipsTo?: string; limit: number },
+  input: { maxPriceMinor?: number; shipsTo?: string; preferCurrency?: string; limit: number },
 ): ProductResult[] {
   const out: ProductResult[] = [];
   for (const p of products) {
@@ -86,6 +102,7 @@ export function clusteredToResults(
     const offer = selectBestOffer(p.offers, {
       maxPriceMinor: input.maxPriceMinor,
       shipsTo: input.shipsTo,
+      preferCurrency: input.preferCurrency,
     });
     if (!offer) continue;
     out.push({

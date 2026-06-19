@@ -153,6 +153,10 @@ export function createGlobalCatalogClient(
 
   return {
     async search(input: CatalogSearchInput) {
+      const context: Record<string, unknown> = {};
+      if (input.shipsTo) context.address_country = input.shipsTo;
+      if (input.currency) context.currency = input.currency;
+
       const catalog: Record<string, unknown> = {
         query: input.query,
         filters: {
@@ -162,6 +166,7 @@ export function createGlobalCatalogClient(
         },
         pagination: { limit: input.limit },
       };
+      if (Object.keys(context).length > 0) catalog.context = context;
       if (input.savedCatalogSlug) catalog.saved_catalog_slug = input.savedCatalogSlug;
 
       const structured = await call("search_catalog", { catalog });
@@ -174,6 +179,7 @@ export function createGlobalCatalogClient(
       return clusteredToResults(parsed.data.products.map(toClustered), {
         maxPriceMinor: input.maxPriceMinor,
         shipsTo: undefined, // already filtered server-side via filters.ships_to
+        preferCurrency: input.currency,
         limit: input.limit,
       });
     },
