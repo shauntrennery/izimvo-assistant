@@ -3,6 +3,7 @@ import type { AppDeps } from "./deps.js";
 import { checkoutRoutes } from "./checkout.js";
 import { searchProductsRoutes } from "./tools.search-products.js";
 import { sessionRoutes } from "./session.js";
+import { speechifyWebhookRoutes } from "./webhooks.speechify.js";
 
 /**
  * Composition root for the HTTP shell. Hono lives only in this layer; routes
@@ -16,6 +17,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/v1/session", sessionRoutes(deps));
   app.route("/v1/tools/search-products", searchProductsRoutes(deps));
   app.route("/v1/checkout", checkoutRoutes(deps));
+  app.route("/v1/webhooks/speechify", speechifyWebhookRoutes(deps));
 
   return app;
 }

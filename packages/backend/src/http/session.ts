@@ -86,13 +86,21 @@ export function sessionRoutes(deps: AppDeps): Hono {
       return c.json({ error: "session_mint_failed" }, 502);
     }
 
-    await deps.repo.createSession({
+    const created = await deps.repo.createSession({
       siteId: site.id,
       categorySlug: resolved.value.slug,
       userIdentity: req.userIdentity ?? null,
       origin,
       conversationId: minted.conversationId,
     });
+
+    void deps.repo
+      .recordUsageEvent({
+        sessionId: created.id,
+        kind: "session_start",
+        payload: { categorySlug: resolved.value.slug, locale },
+      })
+      .catch(() => undefined);
 
     return c.json({
       sessionToken: minted.sessionToken,

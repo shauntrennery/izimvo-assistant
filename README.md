@@ -77,4 +77,12 @@ pnpm typecheck
   binds the request Origin to the session's origin, and persists the
   `attributions` row with the precise UPID. Contract test: click-through carries
   UTM + records a row; origin mismatch → 403.
-- Phases 5–6: in progress per PLAN.md §10.
+- **Phase 5 — post-call webhook + usage** ✅ `POST /v1/webhooks/speechify`
+  (HMAC-verified): correlate the conversation id back to the session and persist
+  a `call_ended` usage event with the evaluation / transcript ref / duration;
+  `session_start` is recorded at mint and `tool_call` at search. Acks
+  uncorrelated calls (200, `recorded:false`) to stop retries. Contract test:
+  signed → usage keyed to the right session; unsigned → 401.
+- **Phase 6 — hardening** ⏳ remaining: Redis-backed rate limiting for
+  horizontal scale, loader versioned-core split, structured logs/request ids,
+  abuse/load testing.

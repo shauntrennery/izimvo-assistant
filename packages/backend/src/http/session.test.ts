@@ -52,6 +52,12 @@ describe("POST /v1/session", () => {
     });
   });
 
+  it("records a session_start usage event on mint", async () => {
+    await post(app, validBody, { origin: "https://shop.example.com" });
+    const starts = repo.usage.filter((u) => u.kind === "session_start");
+    expect(starts).toHaveLength(1);
+  });
+
   it("accepts the Referer header when Origin is absent", async () => {
     const res = await post(app, validBody, {
       referer: "https://www.example.com/page",
