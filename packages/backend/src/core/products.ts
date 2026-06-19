@@ -62,17 +62,24 @@ export interface ClusteredProduct {
  */
 export function selectBestOffer(
   offers: CatalogOffer[],
-  filter: { maxPriceMinor?: number; shipsTo?: string; preferCurrency?: string },
+  filter: {
+    maxPriceMinor?: number;
+    shipsTo?: string;
+    preferCurrency?: string;
+    /** When true, only offers in preferCurrency qualify (product dropped otherwise). */
+    strictCurrency?: boolean;
+  },
 ): CatalogOffer | null {
   const shipsOk = offers.filter(
     (o) => !filter.shipsTo || !o.shipsTo || o.shipsTo.includes(filter.shipsTo),
   );
 
-  // Prefer the buyer's currency when any offer is priced in it.
+  // Prefer the buyer's currency; when strict, require it (drop otherwise).
   let pool = shipsOk;
   if (filter.preferCurrency) {
     const inCurrency = shipsOk.filter((o) => o.currency === filter.preferCurrency);
-    if (inCurrency.length > 0) pool = inCurrency;
+    if (filter.strictCurrency) pool = inCurrency;
+    else if (inCurrency.length > 0) pool = inCurrency;
   }
 
   // Budget is expressed in the buyer's currency; only enforce it within the
@@ -94,7 +101,13 @@ export function selectBestOffer(
  */
 export function clusteredToResults(
   products: ClusteredProduct[],
-  input: { maxPriceMinor?: number; shipsTo?: string; preferCurrency?: string; limit: number },
+  input: {
+    maxPriceMinor?: number;
+    shipsTo?: string;
+    preferCurrency?: string;
+    strictCurrency?: boolean;
+    limit: number;
+  },
 ): ProductResult[] {
   const out: ProductResult[] = [];
   for (const p of products) {
@@ -103,6 +116,7 @@ export function clusteredToResults(
       maxPriceMinor: input.maxPriceMinor,
       shipsTo: input.shipsTo,
       preferCurrency: input.preferCurrency,
+      strictCurrency: input.strictCurrency,
     });
     if (!offer) continue;
     out.push({

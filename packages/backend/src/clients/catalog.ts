@@ -180,6 +180,7 @@ export function createGlobalCatalogClient(
         maxPriceMinor: input.maxPriceMinor,
         shipsTo: undefined, // already filtered server-side via filters.ships_to
         preferCurrency: input.currency,
+        strictCurrency: input.currency !== undefined, // only show the buyer's currency
         limit: input.limit,
       });
     },

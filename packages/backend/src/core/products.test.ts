@@ -44,6 +44,11 @@ describe("selectBestOffer", () => {
     const onlyUsd = [{ merchant: "US", priceMinor: 14861, currency: "USD", checkoutUrl: "https://us.test/p" }];
     expect(selectBestOffer(onlyUsd, { preferCurrency: "ZAR" })?.merchant).toBe("US");
   });
+
+  it("drops the product (null) under strictCurrency when no offer matches", () => {
+    const onlyUsd = [{ merchant: "US", priceMinor: 14861, currency: "USD", checkoutUrl: "https://us.test/p" }];
+    expect(selectBestOffer(onlyUsd, { preferCurrency: "ZAR", strictCurrency: true })).toBeNull();
+  });
 });
 
 describe("clusteredToResults", () => {
