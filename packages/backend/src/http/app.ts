@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
+import { catalogSearchRoutes } from "./catalog.search.js";
 import { checkoutRoutes } from "./checkout.js";
+import { SEARCH_PAGE_HTML } from "./searchPage.js";
 import { searchProductsRoutes } from "./tools.search-products.js";
 import { sessionRoutes } from "./session.js";
 import { speechifyWebhookRoutes } from "./webhooks.speechify.js";
@@ -38,6 +40,7 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   app.route("/v1/session", sessionRoutes(deps));
+  app.route("/v1/catalog/search", catalogSearchRoutes(deps));
   app.route("/v1/tools/search-products", searchProductsRoutes(deps));
   app.route("/v1/checkout", checkoutRoutes(deps));
   app.route("/v1/webhooks/speechify", speechifyWebhookRoutes(deps));
@@ -78,6 +81,13 @@ export function createApp(deps: AppDeps): Hono {
       return c.body(html);
     });
   }
+
+  // Catalogue search page (self-contained HTML compiled into the bundle, so it
+  // needs no file read or deps wiring). Calls GET /v1/catalog/search same-origin.
+  app.get("/search", (c) => {
+    c.header("content-type", "text/html; charset=utf-8");
+    return c.body(SEARCH_PAGE_HTML);
+  });
 
   return app;
 }

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
+import { currencyForCountry } from "../core/countries.js";
 import type { ProductResult } from "../core/products.js";
 import { putConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
@@ -30,17 +31,6 @@ const DEFAULT_SHIPS_TO = "ZA";
 const RESULT_LIMIT = 3;
 
 const CONVERSATION_HEADER = "x-speechify-conversation-id";
-
-// Buyer currency by ships-to country, so prices surface in the local currency.
-const COUNTRY_CURRENCY: Record<string, string> = {
-  ZA: "ZAR",
-  US: "USD",
-  GB: "GBP",
-  AU: "AUD",
-  CA: "CAD",
-  NZ: "NZD",
-  EU: "EUR",
-};
 
 const argsSchema = z.object({
   query: z.string().min(1),
@@ -128,7 +118,7 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
         savedCatalogSlug: scope.savedCatalogSlug ?? undefined,
         maxPriceMinor: args.max_price !== undefined ? Math.round(args.max_price * 100) : undefined,
         shipsTo,
-        currency: COUNTRY_CURRENCY[shipsTo.toUpperCase()],
+        currency: currencyForCountry(shipsTo),
         optionPreferences: args.color ? ["Color"] : undefined,
         limit: RESULT_LIMIT,
       });
