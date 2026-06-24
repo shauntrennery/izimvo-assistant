@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import { createGlobalCatalogClient } from "./clients/catalog.js";
+import { createGlobalCatalogClient, createStorefrontCatalogClient } from "./clients/catalog.js";
+import type { CatalogClient } from "./core/products.js";
 import { createJwtCache } from "./clients/jwtCache.js";
 import { createSpeechifyClient } from "./clients/speechify.js";
 import { loadEnv } from "./config/env.js";
@@ -41,11 +42,30 @@ function readExampleHtml(file: string): string | undefined {
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
 }
 
-const jwt = createJwtCache({
-  tokenUrl: env.SHOPIFY_CATALOG_TOKEN_URL,
-  clientId: env.SHOPIFY_CATALOG_CLIENT_ID,
-  clientSecret: env.SHOPIFY_CATALOG_CLIENT_SECRET,
-});
+/**
+ * Pick the catalog client by deployment scope (PLAN §3). Storefront mode binds
+ * the adviser to a single store's own catalog so recommendations + checkout stay
+ * on that store; Global mode searches the cross-merchant catalog with a cached JWT.
+ */
+function createCatalog(): CatalogClient {
+  if (env.CATALOG_MODE === "storefront") {
+    const mcpUrl = env.SHOPIFY_STORE_MCP_URL;
+    if (!mcpUrl) throw new Error("SHOPIFY_STORE_MCP_URL is required when CATALOG_MODE=storefront");
+    return createStorefrontCatalogClient({
+      mcpUrl,
+      agentProfileUrl: env.SHOPIFY_UCP_AGENT_PROFILE,
+    });
+  }
+  const jwt = createJwtCache({
+    tokenUrl: env.SHOPIFY_CATALOG_TOKEN_URL,
+    clientId: env.SHOPIFY_CATALOG_CLIENT_ID,
+    clientSecret: env.SHOPIFY_CATALOG_CLIENT_SECRET,
+  });
+  return createGlobalCatalogClient(
+    { mcpUrl: env.SHOPIFY_CATALOG_MCP_URL, agentProfileUrl: env.SHOPIFY_UCP_AGENT_PROFILE },
+    jwt,
+  );
+}
 
 const app = createApp({
   repo: createRepo(createDb(env.DATABASE_URL)),
@@ -54,10 +74,7 @@ const app = createApp({
     agentId: env.SPEECHIFY_AGENT_ID,
     baseUrl: env.SPEECHIFY_API_BASE,
   }),
-  catalog: createGlobalCatalogClient(
-    { mcpUrl: env.SHOPIFY_CATALOG_MCP_URL, agentProfileUrl: env.SHOPIFY_UCP_AGENT_PROFILE },
-    jwt,
-  ),
+  catalog: createCatalog(),
   rateLimiter: createMemoryRateLimiter(),
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,

@@ -102,6 +102,25 @@ function parseEnvelope(text: string): unknown {
   }
 }
 
+/**
+ * Extract the UCP payload from a JSON-RPC tool result. The cross-merchant Global
+ * Catalog MCP returns it as `result.structuredContent`; the per-store Storefront
+ * MCP returns the same payload as a JSON string in `result.content[].text`.
+ * Accept either so both catalogs share one client.
+ */
+function extractStructured(env: unknown): unknown {
+  const result = pick(env, "result");
+  const structured = pick(result, "structuredContent");
+  if (structured !== undefined) return structured;
+  const content = pick(result, "content");
+  if (Array.isArray(content)) {
+    const node = content.find((c) => pick(c, "type") === "text");
+    const text = pick(node, "text");
+    if (typeof text === "string") return parseEnvelope(text);
+  }
+  return undefined;
+}
+
 /** Map a UCP product (multi-seller variants) to a core ClusteredProduct. */
 function toClustered(p: Product): ClusteredProduct {
   const image = p.media?.find((m) => m.type === "image")?.url;
@@ -116,27 +135,38 @@ function toClustered(p: Product): ClusteredProduct {
   return { upid: p.id, title: p.title, imageUrl: image, offers };
 }
 
-export function createGlobalCatalogClient(
-  config: CatalogConfig,
-  jwt: JwtProvider,
-  fetchImpl: typeof fetch = fetch,
-): CatalogClient {
+interface UcpClientOptions extends CatalogConfig {
+  /** Bearer-token provider (Global Catalog). Omit for the public Storefront MCP. */
+  jwt?: JwtProvider;
+  /** Detail tool name: `get_product` (Global) vs `get_product_details` (Storefront). */
+  detailTool: string;
+  fetchImpl: typeof fetch;
+}
+
+/**
+ * Shared client over the `dev.ucp.shopping.catalog.search` capability. Both
+ * Shopify catalogs — cross-merchant Global and single-store Storefront — speak
+ * the same wire contract; they differ only in URL, auth (Bearer JWT vs none),
+ * the detail tool name, and how the payload is wrapped. All four are parameters.
+ */
+function createUcpCatalogClient(o: UcpClientOptions): CatalogClient {
+  const { fetchImpl } = o;
   async function call(name: string, catalogArgs: Record<string, unknown>): Promise<unknown> {
-    const token = await jwt.getToken();
-    const res = await fetchImpl(config.mcpUrl, {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    };
+    if (o.jwt) headers.authorization = `Bearer ${await o.jwt.getToken()}`;
+    const res = await fetchImpl(o.mcpUrl, {
       method: "POST",
-      headers: {
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-        accept: "application/json, text/event-stream",
-      },
+      headers,
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
         method: "tools/call",
         params: {
           name,
-          arguments: { ...catalogArgs, meta: { "ucp-agent": { profile: config.agentProfileUrl } } },
+          arguments: { ...catalogArgs, meta: { "ucp-agent": { profile: o.agentProfileUrl } } },
         },
       }),
     });
@@ -148,7 +178,7 @@ export function createGlobalCatalogClient(
     if (rpcError) {
       throw new CatalogError(`catalog ${name} error: ${JSON.stringify(rpcError)}`);
     }
-    return pick(pick(env, "result"), "structuredContent");
+    return extractStructured(env);
   }
 
   return {
@@ -186,7 +216,7 @@ export function createGlobalCatalogClient(
     },
 
     async getProduct(upid: string): Promise<ProductDetail> {
-      const structured = await call("get_product", { catalog: { id: upid } });
+      const structured = await call(o.detailTool, { catalog: { id: upid } });
       const parsed = detailStructured.safeParse(structured);
       if (!parsed.success) {
         throw new CatalogError(`unexpected catalog detail response: ${parsed.error.message}`);
@@ -196,9 +226,34 @@ export function createGlobalCatalogClient(
       if (!best) throw new CatalogError(`product ${upid} has no available offers`);
 
       const options = p.options
-        ? Object.fromEntries(p.options.map((o) => [o.name, o.values.map((v) => v.label)]))
+        ? Object.fromEntries(p.options.map((opt) => [opt.name, opt.values.map((v) => v.label)]))
         : undefined;
       return { ...best, description: p.description?.html, options };
     },
   };
+}
+
+/**
+ * Cross-merchant Global Catalog client (PLAN §7.5): Bearer-JWT auth against the
+ * shared `catalog.shopify.com` MCP, `get_product` for detail.
+ */
+export function createGlobalCatalogClient(
+  config: CatalogConfig,
+  jwt: JwtProvider,
+  fetchImpl: typeof fetch = fetch,
+): CatalogClient {
+  return createUcpCatalogClient({ ...config, jwt, detailTool: "get_product", fetchImpl });
+}
+
+/**
+ * Single-store Storefront Catalog client (PLAN §3 swap point): the store's own
+ * public `{store}.myshopify.com/api/mcp` endpoint — no auth, `get_product_details`
+ * for detail. Scopes the adviser to one merchant's catalog so recommendations and
+ * checkout stay on that store.
+ */
+export function createStorefrontCatalogClient(
+  config: CatalogConfig,
+  fetchImpl: typeof fetch = fetch,
+): CatalogClient {
+  return createUcpCatalogClient({ ...config, detailTool: "get_product_details", fetchImpl });
 }
