@@ -32,6 +32,9 @@ const envSchema = z.object({
   // Required when CATALOG_MODE=storefront: the store's Storefront MCP endpoint,
   // e.g. https://{store}.myshopify.com/api/mcp.
   SHOPIFY_STORE_MCP_URL: z.string().url().optional(),
+  // Optional display name for the single store (Storefront mode); shown as the
+  // offer merchant on product results. Falls back to blank if unset.
+  STORE_DISPLAY_NAME: z.string().optional(),
 
   DATABASE_URL: z.string().min(1),
 

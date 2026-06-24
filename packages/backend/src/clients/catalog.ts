@@ -121,16 +121,28 @@ function extractStructured(env: unknown): unknown {
   return undefined;
 }
 
+interface ClusterOpts {
+  /**
+   * Synthesize a checkout URL for variants the catalog returns without one. The
+   * Global Catalog ships per-merchant `checkout_url`; the single-store Storefront
+   * MCP omits it (you build a cart permalink from the variant id instead).
+   */
+  checkoutUrlFor?: (variantId: string) => string | undefined;
+  /** Fallback merchant when a variant carries no seller (single-store Storefront). */
+  defaultMerchant?: string;
+}
+
 /** Map a UCP product (multi-seller variants) to a core ClusteredProduct. */
-function toClustered(p: Product): ClusteredProduct {
+function toClustered(p: Product, opts: ClusterOpts = {}): ClusteredProduct {
   const image = p.media?.find((m) => m.type === "image")?.url;
   const offers = p.variants
-    .filter((v) => v.availability?.available !== false && !!v.checkout_url)
-    .map((v) => ({
-      merchant: v.seller?.name ?? "Unknown",
+    .map((v) => ({ v, url: v.checkout_url ?? opts.checkoutUrlFor?.(v.id) }))
+    .filter(({ v, url }) => v.availability?.available !== false && !!url)
+    .map(({ v, url }) => ({
+      merchant: v.seller?.name ?? opts.defaultMerchant ?? "",
       priceMinor: v.price.amount,
       currency: v.price.currency,
-      checkoutUrl: v.checkout_url as string,
+      checkoutUrl: url as string,
     }));
   return { upid: p.id, title: p.title, imageUrl: image, offers };
 }
@@ -140,6 +152,10 @@ interface UcpClientOptions extends CatalogConfig {
   jwt?: JwtProvider;
   /** Detail tool name: `get_product` (Global) vs `get_product_details` (Storefront). */
   detailTool: string;
+  /** Build a checkout URL from a variant id when the catalog omits one (Storefront). */
+  checkoutUrlFor?: (variantId: string) => string | undefined;
+  /** Fallback merchant name when variants carry no seller (single-store Storefront). */
+  defaultMerchant?: string;
   fetchImpl: typeof fetch;
 }
 
@@ -206,7 +222,10 @@ function createUcpCatalogClient(o: UcpClientOptions): CatalogClient {
         const msg = ucpErrorMessage(structured) ?? parsed.error.message;
         throw new CatalogError(`catalog search response not usable: ${msg}`);
       }
-      return clusteredToResults(parsed.data.products.map(toClustered), {
+      const clustered = parsed.data.products.map((pp) =>
+        toClustered(pp, { checkoutUrlFor: o.checkoutUrlFor, defaultMerchant: o.defaultMerchant }),
+      );
+      return clusteredToResults(clustered, {
         maxPriceMinor: input.maxPriceMinor,
         shipsTo: undefined, // already filtered server-side via filters.ships_to
         preferCurrency: input.currency,
@@ -222,7 +241,11 @@ function createUcpCatalogClient(o: UcpClientOptions): CatalogClient {
         throw new CatalogError(`unexpected catalog detail response: ${parsed.error.message}`);
       }
       const p = parsed.data.product;
-      const [best] = clusteredToResults([toClustered(p)], { limit: 1 });
+      const clustered = toClustered(p, {
+        checkoutUrlFor: o.checkoutUrlFor,
+        defaultMerchant: o.defaultMerchant,
+      });
+      const [best] = clusteredToResults([clustered], { limit: 1 });
       if (!best) throw new CatalogError(`product ${upid} has no available offers`);
 
       const options = p.options
@@ -252,8 +275,22 @@ export function createGlobalCatalogClient(
  * checkout stay on that store.
  */
 export function createStorefrontCatalogClient(
-  config: CatalogConfig,
+  config: CatalogConfig & { merchantName?: string },
   fetchImpl: typeof fetch = fetch,
 ): CatalogClient {
-  return createUcpCatalogClient({ ...config, detailTool: "get_product_details", fetchImpl });
+  // The Storefront MCP returns no checkout_url; build a Shopify cart permalink
+  // (`/cart/{variantId}:{qty}`) from the variant GID's numeric id instead.
+  const origin = new URL(config.mcpUrl).origin;
+  const checkoutUrlFor = (variantId: string): string | undefined => {
+    const numeric = variantId.split("/").pop()?.split("?")[0];
+    return numeric && /^\d+$/.test(numeric) ? `${origin}/cart/${numeric}:1` : undefined;
+  };
+  return createUcpCatalogClient({
+    mcpUrl: config.mcpUrl,
+    agentProfileUrl: config.agentProfileUrl,
+    detailTool: "get_product_details",
+    checkoutUrlFor,
+    defaultMerchant: config.merchantName,
+    fetchImpl,
+  });
 }

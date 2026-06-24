@@ -54,6 +54,7 @@ function createCatalog(): CatalogClient {
     return createStorefrontCatalogClient({
       mcpUrl,
       agentProfileUrl: env.SHOPIFY_UCP_AGENT_PROFILE,
+      merchantName: env.STORE_DISPLAY_NAME,
     });
   }
   const jwt = createJwtCache({

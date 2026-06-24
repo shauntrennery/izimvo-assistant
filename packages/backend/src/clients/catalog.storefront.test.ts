@@ -4,6 +4,7 @@ import { createStorefrontCatalogClient, CatalogError } from "./catalog.js";
 const config = {
   mcpUrl: "https://trend-furniture.myshopify.test/api/mcp",
   agentProfileUrl: "https://profile.test/agent.json",
+  merchantName: "Trend Furniture",
 };
 
 /**
@@ -21,19 +22,19 @@ function storefrontResult(payload: unknown) {
   );
 }
 
+// The Storefront MCP returns NO checkout_url and NO seller on variants — only
+// the variant GID. The client must synthesize a cart permalink from that id.
 const searchPayload = {
   products: [
     {
-      id: "gid://shopify/Product/1",
+      id: "gid://shopify/Product/7684101472315",
       title: "Oslo 3-Seater Sofa",
       media: [{ type: "image", url: "https://img.test/sofa.jpg" }],
       variants: [
         {
-          id: "v1",
+          id: "gid://shopify/ProductVariant/43700687994939",
           price: { amount: 1299900, currency: "ZAR" },
-          checkout_url: "https://trend-furniture.myshopify.test/cart/1:1",
           availability: { available: true },
-          seller: { name: "Trend Furniture" },
         },
       ],
     },
@@ -41,7 +42,7 @@ const searchPayload = {
 };
 
 describe("createStorefrontCatalogClient.search", () => {
-  it("calls search_catalog with NO auth header and parses the content-text payload", async () => {
+  it("synthesizes a cart permalink, sends no auth header, parses the content-text payload", async () => {
     const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       expect(String(url)).toBe(config.mcpUrl);
       // Public storefront endpoint — no Bearer token may be sent.
@@ -58,11 +59,12 @@ describe("createStorefrontCatalogClient.search", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
-      upid: "gid://shopify/Product/1",
+      upid: "gid://shopify/Product/7684101472315",
       priceMinor: 1299900,
       currency: "ZAR",
       bestOfferMerchant: "Trend Furniture",
-      checkoutUrl: "https://trend-furniture.myshopify.test/cart/1:1",
+      // built from the variant GID's numeric id against the store origin
+      checkoutUrl: "https://trend-furniture.myshopify.test/cart/43700687994939:1",
       imageUrl: "https://img.test/sofa.jpg",
     });
   });
@@ -84,15 +86,13 @@ describe("createStorefrontCatalogClient.getProduct", () => {
   it("calls get_product_details (the storefront detail tool)", async () => {
     const detailPayload = {
       product: {
-        id: "gid://shopify/Product/1",
+        id: "gid://shopify/Product/7684101472315",
         title: "Oslo 3-Seater Sofa",
         variants: [
           {
-            id: "v1",
+            id: "gid://shopify/ProductVariant/43700687994939",
             price: { amount: 1299900, currency: "ZAR" },
-            checkout_url: "https://trend-furniture.myshopify.test/cart/1:1",
             availability: { available: true },
-            seller: { name: "Trend Furniture" },
           },
         ],
       },
@@ -100,11 +100,15 @@ describe("createStorefrontCatalogClient.getProduct", () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       expect(body.params.name).toBe("get_product_details");
-      expect(body.params.arguments.catalog.id).toBe("gid://shopify/Product/1");
+      expect(body.params.arguments.catalog.id).toBe("gid://shopify/Product/7684101472315");
       return storefrontResult(detailPayload);
     });
     const client = createStorefrontCatalogClient(config, fetchImpl as unknown as typeof fetch);
-    const detail = await client.getProduct("gid://shopify/Product/1");
-    expect(detail).toMatchObject({ upid: "gid://shopify/Product/1", priceMinor: 1299900 });
+    const detail = await client.getProduct("gid://shopify/Product/7684101472315");
+    expect(detail).toMatchObject({
+      upid: "gid://shopify/Product/7684101472315",
+      priceMinor: 1299900,
+      checkoutUrl: "https://trend-furniture.myshopify.test/cart/43700687994939:1",
+    });
   });
 });
