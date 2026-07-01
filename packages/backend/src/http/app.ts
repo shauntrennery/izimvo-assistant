@@ -4,6 +4,7 @@ import { getConversationCart } from "../infra/conversationCart.js";
 import { getConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
 import { addToCartRoutes } from "./tools.add-to-cart.js";
+import { productInfoRoutes } from "./tools.product-info.js";
 import { catalogSearchRoutes } from "./catalog.search.js";
 import { checkoutRoutes } from "./checkout.js";
 import { SEARCH_PAGE_HTML } from "./searchPage.js";
@@ -52,6 +53,7 @@ export function createApp(deps: AppDeps): Hono {
   app.route("/v1/catalog/search", catalogSearchRoutes(deps));
   app.route("/v1/tools/search-products", searchProductsRoutes(deps));
   app.route("/v1/tools/add-to-cart", addToCartRoutes(deps));
+  app.route("/v1/tools/product-info", productInfoRoutes(deps));
   app.route("/v1/checkout", checkoutRoutes(deps));
   app.route("/v1/webhooks/speechify", speechifyWebhookRoutes(deps));
 

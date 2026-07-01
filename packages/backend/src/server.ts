@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { createGlobalCatalogClient, createStorefrontCatalogClient } from "./clients/catalog.js";
 import { createStorefrontCartClient } from "./clients/cart.storefront.js";
+import { createStorefrontFaqClient } from "./clients/faq.storefront.js";
+import type { FaqClient } from "./clients/faq.storefront.js";
 import type { CartClient } from "./core/cart.js";
 import type { CatalogClient } from "./core/products.js";
 import { createJwtCache } from "./clients/jwtCache.js";
@@ -77,6 +79,12 @@ function createCart(): CartClient | undefined {
   return createStorefrontCartClient({ mcpUrl: env.SHOPIFY_STORE_MCP_URL });
 }
 
+/** Store policy / FAQ lookups, only in Storefront mode. */
+function createFaq(): FaqClient | undefined {
+  if (env.CATALOG_MODE !== "storefront" || !env.SHOPIFY_STORE_MCP_URL) return undefined;
+  return createStorefrontFaqClient({ mcpUrl: env.SHOPIFY_STORE_MCP_URL });
+}
+
 const app = createApp({
   repo: createRepo(createDb(env.DATABASE_URL)),
   speechify: createSpeechifyClient({
@@ -86,6 +94,7 @@ const app = createApp({
   }),
   catalog: createCatalog(),
   cart: createCart(),
+  faq: createFaq(),
   rateLimiter: createMemoryRateLimiter(),
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,

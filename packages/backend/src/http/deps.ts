@@ -1,4 +1,5 @@
 import type { SpeechifyClient } from "../clients/speechify.js";
+import type { FaqClient } from "../clients/faq.storefront.js";
 import type { CartClient } from "../core/cart.js";
 import type { CatalogClient } from "../core/products.js";
 import type { RateLimiter } from "../core/rateLimit.js";
@@ -14,6 +15,8 @@ export interface AppDeps {
   catalog: CatalogClient;
   /** Storefront-only: real MCP-managed cart. Absent in Global mode. */
   cart?: CartClient;
+  /** Storefront-only: store policy / FAQ lookups. Absent in Global mode. */
+  faq?: FaqClient;
   rateLimiter: RateLimiter;
   /** HMAC secret for the post-call webhook (set by us in the Speechify console). */
   webhookHmacSecret: string;
