@@ -4,7 +4,7 @@ import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
 import { getConversationCartId, putConversationCart } from "../infra/conversationCart.js";
 import type { AppDeps } from "./deps.js";
-import { CONVERSATION_HEADER, resolveConversationId } from "./util.js";
+import { CONVERSATION_HEADER, resolveConversationId, speechifySignatureParts } from "./util.js";
 
 /**
  * POST /v1/tools/add-to-cart. The Speechify `add_to_cart` webhook tool. Adds a
@@ -23,6 +23,7 @@ import { CONVERSATION_HEADER, resolveConversationId } from "./util.js";
 
 const SIGNATURE_HEADER = "x-speechify-signature";
 const TIMESTAMP_HEADER = "x-speechify-timestamp";
+const COMBINED_SIGNATURE_HEADER = "speechify-signature";
 const TEST_HEADER = "x-speechify-webhook-test";
 
 const argsSchema = z.object({
@@ -45,13 +46,20 @@ export function addToCartRoutes(deps: AppDeps): Hono {
   const app = new Hono();
 
   app.post("/", async (c) => {
-    // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything.
+    // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything. Accept
+    // both the live (Speechify-Signature: t=,v0=) and console (split header)
+    // formats; verify with this tool's own minted secret.
     const rawBody = await c.req.text();
+    const { signature, timestamp } = speechifySignatureParts({
+      combined: c.req.header(COMBINED_SIGNATURE_HEADER),
+      signature: c.req.header(SIGNATURE_HEADER),
+      timestamp: c.req.header(TIMESTAMP_HEADER),
+    });
     const ok = verifyHmacSignature({
       rawBody,
-      signature: c.req.header(SIGNATURE_HEADER),
-      secret: deps.toolHmacSecret,
-      timestamp: c.req.header(TIMESTAMP_HEADER),
+      signature,
+      secret: deps.addToCartHmacSecret,
+      timestamp,
     });
     if (!ok) return c.json({ error: "invalid_signature" }, 401);
 

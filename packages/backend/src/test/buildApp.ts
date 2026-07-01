@@ -21,6 +21,8 @@ export function buildApp(overrides: Partial<AppDeps> = {}) {
     rateLimiter: createMemoryRateLimiter(),
     webhookHmacSecret: "whsec_test",
     toolHmacSecret: "toolsec_test",
+    addToCartHmacSecret: "toolsec_test",
+    productInfoHmacSecret: "toolsec_test",
     utmSource: "izimvo",
     storeDefaultCountry: "ZA",
     sessionIpRateLimitPerMin: 30,

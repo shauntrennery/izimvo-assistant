@@ -15,6 +15,34 @@ export function clientIp(headers: Headers): string {
 /** Header a webhook tool may (rarely) carry the conversation id on. */
 export const CONVERSATION_HEADER = "x-speechify-conversation-id";
 
+/**
+ * Normalize a Speechify webhook signature into `{ signature, timestamp }` for
+ * `verifyHmacSignature`. Speechify's documented live format is a single
+ * `Speechify-Signature: t=<unix-sec>,v0=<hex>` header; the console's test-webhook
+ * (what the search tool was first built against) instead sends split
+ * `X-Speechify-Signature` + `X-Speechify-Timestamp`. Accept both so a tool
+ * verifies whichever the platform sends.
+ */
+export function speechifySignatureParts(headers: {
+  combined?: string | null; // Speechify-Signature: t=..,v0=..
+  signature?: string | null; // X-Speechify-Signature
+  timestamp?: string | null; // X-Speechify-Timestamp
+}): { signature: string | undefined; timestamp: string | undefined } {
+  const combined = headers.combined;
+  if (combined && combined.includes("v0=")) {
+    const parts: Record<string, string> = {};
+    for (const seg of combined.split(",")) {
+      const i = seg.indexOf("=");
+      if (i > 0) parts[seg.slice(0, i).trim()] = seg.slice(i + 1).trim();
+    }
+    return { signature: parts.v0, timestamp: parts.t };
+  }
+  return {
+    signature: headers.signature ?? undefined,
+    timestamp: headers.timestamp ?? undefined,
+  };
+}
+
 function firstString(values: unknown[]): string | null {
   for (const v of values) if (typeof v === "string" && v.length > 0) return v;
   return null;

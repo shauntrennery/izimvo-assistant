@@ -22,6 +22,10 @@ export interface AppDeps {
   webhookHmacSecret: string;
   /** HMAC secret for the search_products tool (auto-minted by Speechify on create). */
   toolHmacSecret: string;
+  /** HMAC secret for the add_to_cart tool (its own Speechify-minted secret). */
+  addToCartHmacSecret: string;
+  /** HMAC secret for the product_info tool (its own Speechify-minted secret). */
+  productInfoHmacSecret: string;
   /** ATTRIBUTION_UTM_SOURCE — stamped on every checkout URL. */
   utmSource: string;
   /** Default ships-to country (ISO-2) when the LLM omits it; drives buyer currency. */

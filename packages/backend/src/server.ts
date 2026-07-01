@@ -98,6 +98,8 @@ const app = createApp({
   rateLimiter: createMemoryRateLimiter(),
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,
+  addToCartHmacSecret: env.SPEECHIFY_ADD_TO_CART_HMAC_SECRET ?? env.SPEECHIFY_TOOL_HMAC_SECRET,
+  productInfoHmacSecret: env.SPEECHIFY_PRODUCT_INFO_HMAC_SECRET ?? env.SPEECHIFY_TOOL_HMAC_SECRET,
   utmSource: env.ATTRIBUTION_UTM_SOURCE,
   storeDefaultCountry: env.STORE_DEFAULT_COUNTRY,
   sessionIpRateLimitPerMin: 30,

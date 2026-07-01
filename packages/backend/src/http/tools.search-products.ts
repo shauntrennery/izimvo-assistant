@@ -6,7 +6,7 @@ import { currencyForCountry } from "../core/countries.js";
 import type { ProductResult } from "../core/products.js";
 import { putConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
-import { CONVERSATION_HEADER, resolveConversationId } from "./util.js";
+import { CONVERSATION_HEADER, resolveConversationId, speechifySignatureParts } from "./util.js";
 
 /**
  * POST /v1/tools/search-products (PLAN §7.4). The Speechify `search_products`
@@ -27,6 +27,7 @@ import { CONVERSATION_HEADER, resolveConversationId } from "./util.js";
 
 const SIGNATURE_HEADER = "x-speechify-signature";
 const TIMESTAMP_HEADER = "x-speechify-timestamp";
+const COMBINED_SIGNATURE_HEADER = "speechify-signature";
 const TEST_HEADER = "x-speechify-webhook-test";
 const RESULT_LIMIT = 3;
 
@@ -41,13 +42,20 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
   const app = new Hono();
 
   app.post("/", async (c) => {
-    // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything.
+    // 1. HMAC over `${timestamp}.${rawBody}`, before parsing anything. Accept
+    // both the live (Speechify-Signature: t=,v0=) and console (split header)
+    // signature formats.
     const rawBody = await c.req.text();
+    const { signature, timestamp } = speechifySignatureParts({
+      combined: c.req.header(COMBINED_SIGNATURE_HEADER),
+      signature: c.req.header(SIGNATURE_HEADER),
+      timestamp: c.req.header(TIMESTAMP_HEADER),
+    });
     const ok = verifyHmacSignature({
       rawBody,
-      signature: c.req.header(SIGNATURE_HEADER),
+      signature,
       secret: deps.toolHmacSecret,
-      timestamp: c.req.header(TIMESTAMP_HEADER),
+      timestamp,
     });
     if (!ok) return c.json({ error: "invalid_signature" }, 401);
 

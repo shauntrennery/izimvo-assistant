@@ -12,6 +12,11 @@ const envSchema = z.object({
   // The search_products tool mints its own signing secret on create (distinct
   // from the post-call webhook secret); shown once in the Speechify console.
   SPEECHIFY_TOOL_HMAC_SECRET: z.string().min(1),
+  // Each Speechify webhook tool mints its OWN signing secret on create. These
+  // hold the add_to_cart / product_info secrets; each falls back to
+  // SPEECHIFY_TOOL_HMAC_SECRET when unset (single-secret setups / tests).
+  SPEECHIFY_ADD_TO_CART_HMAC_SECRET: z.string().min(1).optional(),
+  SPEECHIFY_PRODUCT_INFO_HMAC_SECRET: z.string().min(1).optional(),
   SPEECHIFY_API_BASE: z.string().url().default("https://api.speechify.ai"),
 
   SHOPIFY_CATALOG_CLIENT_ID: z.string().min(1),

@@ -157,6 +157,18 @@ describe("POST /v1/tools/add-to-cart", () => {
     expect(cart.calls).toHaveLength(0);
   });
 
+  it("accepts Speechify's live signature header (Speechify-Signature: t=,v0=)", async () => {
+    const raw = JSON.stringify({ arguments: { product_id: "gid://shopify/Product/7174546686137" } });
+    const t = "1781862411"; // unix seconds
+    const v0 = createHmac("sha256", SECRET).update(`${t}.${raw}`).digest("hex");
+    const res = await ctx.app.request(`/v1/tools/add-to-cart?cid=${CONV_ID}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "speechify-signature": `t=${t},v0=${v0}` },
+      body: raw,
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("rejects an unsigned request with 401", async () => {
     const res = await post({ arguments: { product_id: "x" } }, { signed: false });
     expect(res.status).toBe(401);
