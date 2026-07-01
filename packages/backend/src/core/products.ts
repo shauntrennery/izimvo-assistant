@@ -12,6 +12,15 @@ export interface ProductResult {
   imageUrl?: string;
   bestOfferMerchant?: string;
   checkoutUrl: string;
+  /** Purchasable variant GID (Storefront mode) — what the cart's add_items needs. */
+  variantId?: string;
+}
+
+/** Convert a decimal money amount ("100.0" | 100) to integer minor units. */
+export function decimalToMinor(amount: string | number): number {
+  const n = typeof amount === "number" ? amount : parseFloat(amount);
+  if (!Number.isFinite(n)) throw new Error(`invalid money amount: ${String(amount)}`);
+  return Math.round(n * 100);
 }
 
 export interface ProductDetail extends ProductResult {
@@ -31,7 +40,8 @@ export interface CatalogSearchInput {
 
 export interface CatalogClient {
   search(input: CatalogSearchInput): Promise<ProductResult[]>;
-  getProduct(upid: string): Promise<ProductDetail>;
+  /** `options` selects a specific variant (Storefront mode); Global ignores it. */
+  getProduct(upid: string, options?: Record<string, string>): Promise<ProductDetail>;
 }
 
 /**
@@ -45,6 +55,8 @@ export interface CatalogOffer {
   currency: string;
   checkoutUrl: string;
   shipsTo?: string[];
+  /** Underlying variant GID (Storefront mode), carried onto the ProductResult. */
+  variantId?: string;
 }
 
 export interface ClusteredProduct {
@@ -127,6 +139,7 @@ export function clusteredToResults(
       imageUrl: p.imageUrl,
       bestOfferMerchant: offer.merchant,
       checkoutUrl: offer.checkoutUrl,
+      variantId: offer.variantId,
     });
   }
   return out;

@@ -6,6 +6,7 @@ import { currencyForCountry } from "../core/countries.js";
 import type { ProductResult } from "../core/products.js";
 import { putConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
+import { CONVERSATION_HEADER, resolveConversationId } from "./util.js";
 
 /**
  * POST /v1/tools/search-products (PLAN §7.4). The Speechify `search_products`
@@ -29,40 +30,12 @@ const TIMESTAMP_HEADER = "x-speechify-timestamp";
 const TEST_HEADER = "x-speechify-webhook-test";
 const RESULT_LIMIT = 3;
 
-const CONVERSATION_HEADER = "x-speechify-conversation-id";
-
 const argsSchema = z.object({
   query: z.string().min(1),
   max_price: z.number().positive().optional(),
   color: z.string().min(1).optional(),
   ships_to: z.string().min(2).optional(),
 });
-
-function firstString(values: unknown[]): string | null {
-  for (const v of values) if (typeof v === "string" && v.length > 0) return v;
-  return null;
-}
-
-/**
- * Resolve the conversation id. Speechify's tool webhook carries NO conversation
- * context in the body/headers by default, so we inject it via the tool URL:
- * `?cid={{system__conversation_id}}` (interpolated per session). The body/header
- * spots are kept as fallbacks in case the contract changes.
- */
-function resolveConversationId(
-  body: Record<string, unknown>,
-  header: string | undefined,
-  query: string | undefined,
-): string | null {
-  const conversation = body.conversation as { id?: unknown } | undefined;
-  return firstString([
-    query,
-    body.conversation_id,
-    body.conversationId,
-    conversation?.id,
-    header,
-  ]);
-}
 
 export function searchProductsRoutes(deps: AppDeps): Hono {
   const app = new Hono();

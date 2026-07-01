@@ -3,6 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { createGlobalCatalogClient, createStorefrontCatalogClient } from "./clients/catalog.js";
+import { createStorefrontCartClient } from "./clients/cart.storefront.js";
+import type { CartClient } from "./core/cart.js";
 import type { CatalogClient } from "./core/products.js";
 import { createJwtCache } from "./clients/jwtCache.js";
 import { createSpeechifyClient } from "./clients/speechify.js";
@@ -55,6 +57,7 @@ function createCatalog(): CatalogClient {
       mcpUrl,
       agentProfileUrl: env.SHOPIFY_UCP_AGENT_PROFILE,
       merchantName: env.STORE_DISPLAY_NAME,
+      defaultCountry: env.STORE_DEFAULT_COUNTRY,
     });
   }
   const jwt = createJwtCache({
@@ -68,6 +71,12 @@ function createCatalog(): CatalogClient {
   );
 }
 
+/** Real MCP-managed cart, only in Storefront mode (Global has no single-store cart). */
+function createCart(): CartClient | undefined {
+  if (env.CATALOG_MODE !== "storefront" || !env.SHOPIFY_STORE_MCP_URL) return undefined;
+  return createStorefrontCartClient({ mcpUrl: env.SHOPIFY_STORE_MCP_URL });
+}
+
 const app = createApp({
   repo: createRepo(createDb(env.DATABASE_URL)),
   speechify: createSpeechifyClient({
@@ -76,6 +85,7 @@ const app = createApp({
     baseUrl: env.SPEECHIFY_API_BASE,
   }),
   catalog: createCatalog(),
+  cart: createCart(),
   rateLimiter: createMemoryRateLimiter(),
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,

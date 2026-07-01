@@ -83,31 +83,51 @@ describe("createStorefrontCatalogClient.search", () => {
 });
 
 describe("createStorefrontCatalogClient.getProduct", () => {
-  it("calls get_product_details (the storefront detail tool)", async () => {
-    const detailPayload = {
-      product: {
-        id: "gid://shopify/Product/7684101472315",
-        title: "Oslo 3-Seater Sofa",
-        variants: [
-          {
-            id: "gid://shopify/ProductVariant/43700687994939",
-            price: { amount: 1299900, currency: "ZAR" },
-            availability: { available: true },
-          },
-        ],
+  // get_product_details uses the NATIVE Shopify shape (product_id request;
+  // selectedOrFirstAvailableVariant + decimal price + string description +
+  // options[].values), not the UCP search_catalog shape.
+  const detailPayload = {
+    product: {
+      product_id: "gid://shopify/Product/7684101472315",
+      title: "Oslo 3-Seater Sofa",
+      description: "A deep, comfy three-seater.",
+      image_url: "https://img.test/sofa.jpg",
+      options: [{ name: "Fabric", values: ["Grey", "Charcoal"] }],
+      total_variants: 2,
+      selectedOrFirstAvailableVariant: {
+        variant_id: "gid://shopify/ProductVariant/43700687994939",
+        title: "Grey",
+        price: "1299.0",
+        currency: "GBP",
+        available: true,
       },
-    };
+    },
+  };
+
+  it("sends product_id (+ options + country) and maps the native detail shape", async () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       expect(body.params.name).toBe("get_product_details");
-      expect(body.params.arguments.catalog.id).toBe("gid://shopify/Product/7684101472315");
+      expect(body.params.arguments.product_id).toBe("gid://shopify/Product/7684101472315");
+      expect(body.params.arguments.options).toEqual({ Fabric: "Grey" });
+      expect(body.params.arguments.country).toBe("GB");
       return storefrontResult(detailPayload);
     });
-    const client = createStorefrontCatalogClient(config, fetchImpl as unknown as typeof fetch);
-    const detail = await client.getProduct("gid://shopify/Product/7684101472315");
+    const client = createStorefrontCatalogClient(
+      { ...config, defaultCountry: "GB" },
+      fetchImpl as unknown as typeof fetch,
+    );
+    const detail = await client.getProduct("gid://shopify/Product/7684101472315", {
+      Fabric: "Grey",
+    });
     expect(detail).toMatchObject({
       upid: "gid://shopify/Product/7684101472315",
-      priceMinor: 1299900,
+      title: "Oslo 3-Seater Sofa",
+      priceMinor: 129900, // "1299.0" GBP → minor units
+      currency: "GBP",
+      description: "A deep, comfy three-seater.",
+      options: { Fabric: ["Grey", "Charcoal"] },
+      variantId: "gid://shopify/ProductVariant/43700687994939",
       checkoutUrl: "https://trend-furniture.myshopify.test/cart/43700687994939:1",
     });
   });

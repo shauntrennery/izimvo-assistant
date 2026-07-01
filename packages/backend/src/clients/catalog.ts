@@ -1,12 +1,14 @@
 import { z } from "zod";
 import {
   clusteredToResults,
+  decimalToMinor,
   type CatalogClient,
   type CatalogSearchInput,
   type ClusteredProduct,
   type ProductDetail,
 } from "../core/products.js";
 import type { JwtProvider } from "./jwtCache.js";
+import { callMcpTool, McpError, pick } from "./mcp.js";
 
 /**
  * Global Catalog client (PLAN §7.5), implemented against Shopify's UCP Catalog
@@ -69,9 +71,6 @@ export class CatalogError extends Error {
   }
 }
 
-const pick = (o: unknown, k: string): unknown =>
-  typeof o === "object" && o !== null ? (o as Record<string, unknown>)[k] : undefined;
-
 /** Pull the first UCP error message (`messages[].content`) from structuredContent, if any. */
 function ucpErrorMessage(structured: unknown): string | null {
   const messages = pick(structured, "messages");
@@ -79,46 +78,6 @@ function ucpErrorMessage(structured: unknown): string | null {
   const err = messages.find((m) => (m as { type?: unknown })?.type === "error");
   const content = (err as { content?: unknown } | undefined)?.content;
   return typeof content === "string" ? content : null;
-}
-
-/** Streamable-HTTP MCP may answer as JSON or as an SSE `data:` frame. */
-function parseEnvelope(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const data = text
-      .split(/\r?\n/)
-      .filter((l) => l.startsWith("data:"))
-      .map((l) => l.slice(5).trim())
-      .join("");
-    if (data) {
-      try {
-        return JSON.parse(data);
-      } catch {
-        /* fall through */
-      }
-    }
-    return null;
-  }
-}
-
-/**
- * Extract the UCP payload from a JSON-RPC tool result. The cross-merchant Global
- * Catalog MCP returns it as `result.structuredContent`; the per-store Storefront
- * MCP returns the same payload as a JSON string in `result.content[].text`.
- * Accept either so both catalogs share one client.
- */
-function extractStructured(env: unknown): unknown {
-  const result = pick(env, "result");
-  const structured = pick(result, "structuredContent");
-  if (structured !== undefined) return structured;
-  const content = pick(result, "content");
-  if (Array.isArray(content)) {
-    const node = content.find((c) => pick(c, "type") === "text");
-    const text = pick(node, "text");
-    if (typeof text === "string") return parseEnvelope(text);
-  }
-  return undefined;
 }
 
 interface ClusterOpts {
@@ -143,6 +102,7 @@ function toClustered(p: Product, opts: ClusterOpts = {}): ClusteredProduct {
       priceMinor: v.price.amount,
       currency: v.price.currency,
       checkoutUrl: url as string,
+      variantId: v.id,
     }));
   return { upid: p.id, title: p.title, imageUrl: image, offers };
 }
@@ -167,34 +127,21 @@ interface UcpClientOptions extends CatalogConfig {
  */
 function createUcpCatalogClient(o: UcpClientOptions): CatalogClient {
   const { fetchImpl } = o;
+  const jwt = o.jwt;
   async function call(name: string, catalogArgs: Record<string, unknown>): Promise<unknown> {
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    };
-    if (o.jwt) headers.authorization = `Bearer ${await o.jwt.getToken()}`;
-    const res = await fetchImpl(o.mcpUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "tools/call",
-        params: {
-          name,
-          arguments: { ...catalogArgs, meta: { "ucp-agent": { profile: o.agentProfileUrl } } },
-        },
-      }),
-    });
-    if (!res.ok) {
-      throw new CatalogError(`catalog ${name} failed: ${res.status}`, res.status);
+    const args = { ...catalogArgs, meta: { "ucp-agent": { profile: o.agentProfileUrl } } };
+    try {
+      return await callMcpTool(
+        { url: o.mcpUrl, fetchImpl, authToken: jwt ? () => jwt.getToken() : undefined },
+        name,
+        args,
+      );
+    } catch (e) {
+      throw new CatalogError(
+        e instanceof Error ? e.message : `catalog ${name} failed`,
+        e instanceof McpError ? e.status : undefined,
+      );
     }
-    const env = parseEnvelope(await res.text());
-    const rpcError = pick(env, "error");
-    if (rpcError) {
-      throw new CatalogError(`catalog ${name} error: ${JSON.stringify(rpcError)}`);
-    }
-    return extractStructured(env);
   }
 
   return {
@@ -269,13 +216,104 @@ export function createGlobalCatalogClient(
 }
 
 /**
+ * Storefront `get_product_details` uses the native Shopify shape, NOT the UCP
+ * `search_catalog` one: `product_id` request; `selectedOrFirstAvailableVariant`
+ * (variant GID + decimal price), plain-string description, `options[].values`.
+ * (Confirmed by probing the live server — sending `catalog.id` errors with
+ * "Missing required arguments: product_id".)
+ */
+const storefrontVariantSchema = z
+  .object({
+    variant_id: z.string(),
+    price: z.union([z.string(), z.number()]),
+    currency: z.string(),
+    available: z.boolean().optional(),
+    image_url: z.string().optional(),
+  })
+  .passthrough();
+const storefrontDetailSchema = z
+  .object({
+    product: z
+      .object({
+        product_id: z.string(),
+        title: z.string(),
+        description: z.string().optional(),
+        image_url: z.string().optional(),
+        options: z
+          .array(z.object({ name: z.string(), values: z.array(z.string()) }).passthrough())
+          .optional(),
+        selectedOrFirstAvailableVariant: storefrontVariantSchema.optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+interface StorefrontDetailOpts {
+  mcpUrl: string;
+  fetchImpl: typeof fetch;
+  merchantName?: string;
+  defaultCountry?: string;
+  checkoutUrlFor: (variantId: string) => string | undefined;
+}
+
+async function storefrontGetProduct(
+  o: StorefrontDetailOpts,
+  upid: string,
+  selectedOptions?: Record<string, string>,
+): Promise<ProductDetail> {
+  const args: Record<string, unknown> = { product_id: upid };
+  if (selectedOptions && Object.keys(selectedOptions).length > 0) args.options = selectedOptions;
+  if (o.defaultCountry) args.country = o.defaultCountry;
+
+  let structured: unknown;
+  try {
+    structured = await callMcpTool(
+      { url: o.mcpUrl, fetchImpl: o.fetchImpl },
+      "get_product_details",
+      args,
+    );
+  } catch (e) {
+    throw new CatalogError(
+      e instanceof Error ? e.message : "get_product_details failed",
+      e instanceof McpError ? e.status : undefined,
+    );
+  }
+
+  const parsed = storefrontDetailSchema.safeParse(structured);
+  if (!parsed.success) {
+    const msg = ucpErrorMessage(structured) ?? parsed.error.message;
+    throw new CatalogError(`unexpected product detail response: ${msg}`);
+  }
+  const p = parsed.data.product;
+  const variant = p.selectedOrFirstAvailableVariant;
+  if (!variant) throw new CatalogError(`product ${upid} has no available variant`);
+
+  const options = p.options
+    ? Object.fromEntries(p.options.map((opt) => [opt.name, opt.values]))
+    : undefined;
+  return {
+    upid: p.product_id,
+    title: p.title,
+    priceMinor: decimalToMinor(variant.price),
+    currency: variant.currency,
+    imageUrl: variant.image_url ?? p.image_url,
+    bestOfferMerchant: o.merchantName ?? "",
+    checkoutUrl: o.checkoutUrlFor(variant.variant_id) ?? "",
+    variantId: variant.variant_id,
+    description: p.description,
+    options,
+  };
+}
+
+/**
  * Single-store Storefront Catalog client (PLAN §3 swap point): the store's own
- * public `{store}.myshopify.com/api/mcp` endpoint — no auth, `get_product_details`
- * for detail. Scopes the adviser to one merchant's catalog so recommendations and
- * checkout stay on that store.
+ * public `/api/mcp` endpoint — no auth. Search uses the UCP `search_catalog`
+ * capability (shared client); detail uses the native `get_product_details` tool
+ * (different wire shape, handled by `storefrontGetProduct`). Scopes the adviser
+ * to one merchant so recommendations and checkout stay on that store.
  */
 export function createStorefrontCatalogClient(
-  config: CatalogConfig & { merchantName?: string },
+  config: CatalogConfig & { merchantName?: string; defaultCountry?: string },
   fetchImpl: typeof fetch = fetch,
 ): CatalogClient {
   // The Storefront MCP returns no checkout_url; build a Shopify cart permalink
@@ -285,12 +323,27 @@ export function createStorefrontCatalogClient(
     const numeric = variantId.split("/").pop()?.split("?")[0];
     return numeric && /^\d+$/.test(numeric) ? `${origin}/cart/${numeric}:1` : undefined;
   };
-  return createUcpCatalogClient({
+  const ucp = createUcpCatalogClient({
     mcpUrl: config.mcpUrl,
     agentProfileUrl: config.agentProfileUrl,
-    detailTool: "get_product_details",
+    detailTool: "get_product_details", // unused: storefront overrides getProduct below
     checkoutUrlFor,
     defaultMerchant: config.merchantName,
     fetchImpl,
   });
+  return {
+    search: ucp.search,
+    getProduct: (upid, options) =>
+      storefrontGetProduct(
+        {
+          mcpUrl: config.mcpUrl,
+          fetchImpl,
+          merchantName: config.merchantName,
+          defaultCountry: config.defaultCountry,
+          checkoutUrlFor,
+        },
+        upid,
+        options,
+      ),
+  };
 }
