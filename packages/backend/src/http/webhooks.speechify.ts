@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import type { AppDeps } from "./deps.js";
+import { speechifySignatureParts } from "./util.js";
 
 /**
  * POST /v1/webhooks/speechify (PLAN §10 Phase 5). The post-call webhook:
@@ -15,6 +16,7 @@ import type { AppDeps } from "./deps.js";
 
 const SIGNATURE_HEADER = "x-speechify-signature";
 const TIMESTAMP_HEADER = "x-speechify-timestamp";
+const COMBINED_SIGNATURE_HEADER = "speechify-signature";
 
 // Tolerant envelope — store whatever the post-call payload carries. The exact
 // field set is confirmed against the Speechify post-call schema; only
@@ -35,11 +37,18 @@ export function speechifyWebhookRoutes(deps: AppDeps): Hono {
 
   app.post("/", async (c) => {
     const rawBody = await c.req.text();
+    // Accept both Speechify's live combined `Speechify-Signature: t=,v0=` header
+    // and the split X-Speechify-Signature/-Timestamp form.
+    const { signature, timestamp } = speechifySignatureParts({
+      combined: c.req.header(COMBINED_SIGNATURE_HEADER),
+      signature: c.req.header(SIGNATURE_HEADER),
+      timestamp: c.req.header(TIMESTAMP_HEADER),
+    });
     const ok = verifyHmacSignature({
       rawBody,
-      signature: c.req.header(SIGNATURE_HEADER),
+      signature,
       secret: deps.webhookHmacSecret,
-      timestamp: c.req.header(TIMESTAMP_HEADER),
+      timestamp,
     });
     if (!ok) return c.json({ error: "invalid_signature" }, 401);
 
