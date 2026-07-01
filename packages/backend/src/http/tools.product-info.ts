@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import type { PolicyAnswer } from "../clients/faq.storefront.js";
-import type { ProductDetail } from "../core/products.js";
+import { formatMoney, type ProductDetail } from "../core/products.js";
 import type { AppDeps } from "./deps.js";
 import { CONVERSATION_HEADER, resolveConversationId, speechifySignatureParts } from "./util.js";
 
@@ -41,12 +41,13 @@ const argsSchema = z
   });
 
 /** Spoken-facing subset of a product — omit the checkout/variant plumbing. */
-function toProductFacts(d: ProductDetail) {
+function toProductFacts(d: ProductDetail, locale: string) {
   return {
     upid: d.upid,
     title: d.title,
     priceMinor: d.priceMinor,
     currency: d.currency,
+    price: formatMoney(d.priceMinor, d.currency, locale),
     imageUrl: d.imageUrl,
     description: d.description,
     options: d.options,
@@ -98,10 +99,11 @@ export function productInfoRoutes(deps: AppDeps): Hono {
     if (!scope) return c.json({ error: "unknown_conversation" }, 404);
 
     // 4. Gather grounding: product facts (any mode) + store policies (Storefront).
+    const locale = `en-${deps.storeDefaultCountry}`;
     let product: ReturnType<typeof toProductFacts> | undefined;
     if (args.product_id) {
       try {
-        product = toProductFacts(await deps.catalog.getProduct(args.product_id, args.options));
+        product = toProductFacts(await deps.catalog.getProduct(args.product_id, args.options), locale);
       } catch {
         product = undefined; // agent handles a missing product gracefully
       }

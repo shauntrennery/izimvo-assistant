@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   clusteredToResults,
+  decimalToMinor,
+  formatMoney,
   selectBestOffer,
   type ClusteredProduct,
 } from "./products.js";
+
+describe("money helpers", () => {
+  it("decimalToMinor converts decimal strings/numbers to minor units", () => {
+    expect(decimalToMinor("100.0")).toBe(10000);
+    expect(decimalToMinor("1299.5")).toBe(129950);
+    expect(decimalToMinor(100)).toBe(10000);
+  });
+  it("formatMoney renders spoken-ready currency from minor units", () => {
+    expect(formatMoney(142900, "GBP", "en-GB")).toBe("£1,429.00");
+    expect(formatMoney(10000, "GBP", "en-GB")).toBe("£100.00");
+  });
+});
 
 const offers = [
   { merchant: "A", priceMinor: 25000, currency: "ZAR", checkoutUrl: "https://a.test/p", shipsTo: ["ZA"] },

@@ -70,14 +70,17 @@ describe("POST /v1/tools/search-products", () => {
   it("returns at most 3 UTM-tagged products for a signed request", async () => {
     const res = await post(validBody);
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { products: ProductResult[] };
+    const json = (await res.json()) as { products: Array<ProductResult & { price: string }> };
     expect(json.products).toHaveLength(3); // capped from 4
     for (const p of json.products) {
       const u = new URL(p.checkoutUrl);
       expect(u.searchParams.get("utm_source")).toBe("izimvo");
       expect(u.searchParams.get("utm_campaign")).toBe("trail-running");
       expect(u.searchParams.get("utm_content")).toMatch(/^sess_/);
+      // spoken-ready price present (so the agent doesn't read raw minor units)
+      expect(typeof p.price).toBe("string");
     }
+    expect(json.products[0]?.price).toMatch(/199/); // 19900 minor → "…199…"
   });
 
   it("resolves the conversation id from the ?cid= query (real Speechify envelope)", async () => {

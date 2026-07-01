@@ -104,9 +104,16 @@ describe("POST /v1/tools/add-to-cart", () => {
   it("adds the resolved variant and returns a UTM-tagged real checkout URL", async () => {
     const res = await post({ arguments: { product_id: "gid://shopify/Product/7174546686137" } });
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { ok: boolean; cart: CartSummary };
+    const json = (await res.json()) as {
+      ok: boolean;
+      cart: CartSummary & { total: string; lines: Array<{ price: string }> };
+    };
     expect(json.ok).toBe(true);
     expect(json.cart.totalQuantity).toBe(1);
+    // spoken-ready basket total + per-line price for the agent
+    expect(typeof json.cart.total).toBe("string");
+    expect(json.cart.total).toMatch(/100/); // 10000 minor → "…100…"
+    expect(typeof json.cart.lines[0]?.price).toBe("string");
     expect(cart.calls[0]).toEqual({ cartId: null, items: [{ variantId: VARIANT, quantity: 1 }] });
     const u = new URL(json.cart.checkoutUrl);
     expect(u.origin + u.pathname).toBe("https://www.danetti.test/cart/c/cart_1");

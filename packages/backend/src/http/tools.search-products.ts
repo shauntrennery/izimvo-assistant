@@ -3,7 +3,7 @@ import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
 import { currencyForCountry } from "../core/countries.js";
-import type { ProductResult } from "../core/products.js";
+import { formatMoney } from "../core/products.js";
 import { putConversationProducts } from "../infra/conversationProducts.js";
 import type { AppDeps } from "./deps.js";
 import { CONVERSATION_HEADER, resolveConversationId, speechifySignatureParts } from "./util.js";
@@ -108,14 +108,16 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
       return c.json({ products: [] });
     }
 
-    // 5. Cap to 3 (defensive) and UTM-tag each checkout URL.
-    const products: ProductResult[] = results.slice(0, RESULT_LIMIT).map((p) => {
+    // 5. Cap to 3 (defensive), UTM-tag each checkout URL, and add a spoken-ready
+    // price so the agent never reads the raw minor-unit number aloud.
+    const locale = `en-${deps.storeDefaultCountry}`;
+    const products = results.slice(0, RESULT_LIMIT).map((p) => {
       const { url } = tagCheckoutUrl(p.checkoutUrl, {
         source: deps.utmSource,
         categorySlug: scope.categorySlug,
         sessionId: scope.sessionId,
       });
-      return { ...p, checkoutUrl: url };
+      return { ...p, checkoutUrl: url, price: formatMoney(p.priceMinor, p.currency, locale) };
     });
 
     // Stash for the loader to render via polling (the agent's render_products

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { verifyHmacSignature } from "../clients/speechify.js";
 import { tagCheckoutUrl } from "../core/attribution.js";
+import { formatMoney } from "../core/products.js";
 import { getConversationCartId, putConversationCart } from "../infra/conversationCart.js";
 import type { AppDeps } from "./deps.js";
 import { CONVERSATION_HEADER, resolveConversationId, speechifySignatureParts } from "./util.js";
@@ -125,7 +126,17 @@ export function addToCartRoutes(deps: AppDeps): Hono {
         })
         .catch(() => undefined);
 
-      return c.json({ ok: true, cart: tagged });
+      // Add spoken-ready prices so the agent speaks the basket total correctly.
+      const locale = `en-${deps.storeDefaultCountry}`;
+      const cartOut = {
+        ...tagged,
+        total: formatMoney(tagged.subtotalMinor, tagged.currency, locale),
+        lines: tagged.lines.map((l) => ({
+          ...l,
+          price: formatMoney(l.subtotalMinor, l.currency, locale),
+        })),
+      };
+      return c.json({ ok: true, cart: cartOut });
     } catch {
       // Degrade to a spoken-friendly failure rather than a 500 the agent reads
       // aloud as an outage.

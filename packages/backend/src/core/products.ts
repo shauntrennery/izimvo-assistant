@@ -23,6 +23,19 @@ export function decimalToMinor(amount: string | number): number {
   return Math.round(n * 100);
 }
 
+/**
+ * Spoken/display-ready money from minor units, e.g. 142900 GBP → "£1,429.00".
+ * Tool responses include this so the voice agent speaks the price correctly
+ * instead of reading the raw minor-unit integer aloud.
+ */
+export function formatMoney(minorUnits: number, currency: string, locale = "en-GB"): string {
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(minorUnits / 100);
+  } catch {
+    return `${currency} ${(minorUnits / 100).toFixed(2)}`;
+  }
+}
+
 export interface ProductDetail extends ProductResult {
   description?: string;
   options?: Record<string, string[]>;
