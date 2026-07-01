@@ -22,6 +22,7 @@ export function buildApp(overrides: Partial<AppDeps> = {}) {
     webhookHmacSecret: "whsec_test",
     toolHmacSecret: "toolsec_test",
     utmSource: "izimvo",
+    storeDefaultCountry: "ZA",
     sessionIpRateLimitPerMin: 30,
     ...overrides,
     repo,

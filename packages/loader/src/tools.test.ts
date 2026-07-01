@@ -22,6 +22,7 @@ function fakeWidget() {
   return {
     setStatus: vi.fn(),
     showCards: vi.fn(),
+    showCart: vi.fn(),
     openCheckout: vi.fn(),
     onActivate: vi.fn(),
     destroy: vi.fn(),

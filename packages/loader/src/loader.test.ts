@@ -16,6 +16,7 @@ function harness() {
   const widget: Widget = {
     setStatus: (s) => statuses.push(s),
     showCards: vi.fn(),
+    showCart: vi.fn(),
     openCheckout: vi.fn(),
     onActivate: (cb) => {
       activate = cb;
@@ -107,6 +108,7 @@ describe("boot", () => {
     const widget: Widget = {
       setStatus: (s) => statuses.push(s),
       showCards: vi.fn(),
+      showCart: vi.fn(),
       openCheckout: vi.fn(),
       onActivate: (cb) => { activate = cb; },
       destroy: vi.fn(),

@@ -13,6 +13,26 @@ export interface ProductResult {
   checkoutUrl: string;
 }
 
+/** A line + cart summary mirroring the backend (Storefront mode). Money is minor
+ *  units; `checkoutUrl` arrives UTM-tagged. The loader renders these; it never
+ *  computes cart totals or checkout URLs itself. */
+export interface CartLine {
+  productId?: string;
+  title: string;
+  quantity: number;
+  subtotalMinor: number;
+  currency: string;
+}
+
+export interface CartSummary {
+  cartId: string;
+  lines: CartLine[];
+  totalQuantity: number;
+  subtotalMinor: number;
+  currency: string;
+  checkoutUrl: string;
+}
+
 /** Parsed from the host `<script>` data-* attributes (PLAN §7.1). */
 export interface LoaderConfig {
   siteKey: string;
