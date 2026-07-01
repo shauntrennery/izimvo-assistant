@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en-ZA">
+<html lang="en-GB">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Northward Outfitters — advised by Izimvo</title>
+    <title>Danetti — advised by Izimvo</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -255,31 +255,31 @@
 
     <div class="wrap">
       <header class="reveal d1">
-        <div class="brand"><span class="mark"></span>Northward Outfitters</div>
-        <nav class="nav"><span>Field Guide</span><span>Catalogue</span><a href="/docs">Install</a></nav>
+        <div class="brand"><span class="mark"></span>Danetti</div>
+        <nav class="nav"><span>Lookbook</span><span>Catalogue</span><a href="/docs">Install</a></nav>
       </header>
 
       <section class="hero">
-        <p class="eyebrow reveal d1">Voice-led outfitting</p>
-        <h1 class="reveal d2">Gear,<br />properly <em>advised.</em></h1>
+        <p class="eyebrow reveal d1">Voice-led furniture buying</p>
+        <h1 class="reveal d2">Furniture,<br />properly <em>advised.</em></h1>
         <p class="lede reveal d3">
-          Don't scroll a thousand SKUs. Tell our adviser what the day demands —
-          terrain, weather, budget — and it narrows the field to the few things
-          worth carrying, then hands you straight to checkout.
+          Don't scroll a thousand pieces. Tell our adviser the room, the style and
+          the budget — it narrows to the few pieces worth buying, answers your
+          questions, adds them to your basket, and hands you to checkout.
         </p>
         <div class="scope reveal d4">
-          <span class="dot"></span> Adviser scoped to <b id="scope-cat">Trail Running</b>
+          <span class="dot"></span> Adviser scoped to <b id="scope-cat">Sofas</b>
         </div>
       </section>
 
       <div class="pursuits-head reveal d4">
-        <h2>Shop by pursuit</h2>
-        <p>Pick a pursuit to scope the adviser before you talk.</p>
+        <h2>Shop by category</h2>
+        <p>Pick a category to scope the adviser before you talk.</p>
       </div>
       <div id="pursuits" class="reveal d5"></div>
 
       <footer class="reveal d5">
-        <span>© Northward Outfitters — a demo storefront.</span>
+        <span>© Danetti — demo storefront.</span>
         <span>Advised by Izimvo · widget isolated in Shadow DOM</span>
       </footer>
     </div>
@@ -295,12 +295,12 @@
     <script>
       (function () {
         var CATS = [
-          { slug: "trail-running", label: "Trail Running", note: "Featherweight shoes for fast, technical miles." },
-          { slug: "hiking-boots", label: "Hiking Boots", note: "Ankle support and grip for the long approach." },
-          { slug: "rain-shells", label: "Rain Shells", note: "Packable waterproof layers for changeable skies." },
-          { slug: "backpacks", label: "Backpacks", note: "Load-haulers from summit packs to thru-hikes." },
-          { slug: "sleeping-bags", label: "Sleeping Bags", note: "Down and synthetic warmth, rated by season." },
-          { slug: "tents", label: "Tents", note: "Shelters from fast-and-light to basecamp." }
+          { slug: "sofas", label: "Sofas", note: "Contemporary sofas and corner groups." },
+          { slug: "dining-chairs", label: "Dining Chairs", note: "Statement seating for the table." },
+          { slug: "dining-tables", label: "Dining Tables", note: "Extending and fixed, glass to wood." },
+          { slug: "desks", label: "Desks", note: "Home-office desks that look the part." },
+          { slug: "office-chairs", label: "Office Chairs", note: "Ergonomic, without the beige." },
+          { slug: "bar-stools", label: "Bar Stools", note: "Kitchen-island and breakfast-bar seating." }
         ];
 
         var params = new URLSearchParams(location.search);
@@ -338,7 +338,7 @@
         s.src = "https://izimvo-backend-production.up.railway.app/v1/loader.js";
         s.setAttribute("data-site-key", "pk_live_demo");
         s.setAttribute("data-category", active);
-        s.setAttribute("data-locale", "en-ZA");
+        s.setAttribute("data-locale", "en-GB");
         document.body.appendChild(s);
       })();
     </script>

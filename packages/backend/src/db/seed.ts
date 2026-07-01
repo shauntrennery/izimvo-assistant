@@ -20,15 +20,17 @@ async function main() {
       catalogMode: "storefront",
       merchantUrl: "https://www.danetti.com",
       defaultLocale: "en-GB",
-      defaultCategorySlug: "furniture",
+      defaultCategorySlug: "sofas",
     })
     .returning({ id: sites.id });
 
   const siteId = site!.id;
 
+  // Key `pk_live_demo` matches the hosted demo page (examples/host.html) and the
+  // existing prod DB row, so re-pointing to Danetti is an env swap, not a key churn.
   await db.insert(apiKeys).values({
     siteId,
-    publicKey: "pk_live_danetti",
+    publicKey: "pk_live_demo",
     allowedDomains: [
       "localhost",
       // the store itself, if the widget is embedded on the live site for testing
@@ -39,22 +41,23 @@ async function main() {
     rateLimitRpm: 60,
   });
 
-  // Storefront categories. savedCatalogSlug null → the store's whole catalog,
-  // scoped only by the shopper's query (how the Storefront MCP search works).
+  // Storefront categories (must cover the demo page's category tabs). savedCatalogSlug
+  // null → the store's whole catalog, scoped only by the shopper's query (how the
+  // Storefront MCP search works).
   await db.insert(categories).values(
     [
-      "furniture",
+      "sofas",
       "dining-chairs",
       "dining-tables",
-      "sofas",
-      "office-chairs",
       "desks",
+      "office-chairs",
       "bar-stools",
+      "furniture",
     ].map((slug) => ({ siteId, slug, taxonomyId: null, savedCatalogSlug: null })),
   );
 
   // eslint-disable-next-line no-console
-  console.log(`Seeded site ${siteId} with key pk_live_danetti`);
+  console.log(`Seeded Danetti site ${siteId} with key pk_live_demo`);
   process.exit(0);
 }
 
