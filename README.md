@@ -39,11 +39,50 @@ cp packages/backend/.env.example packages/backend/.env   # fill in secrets
 # DB
 pnpm --filter @izimvo/backend db:generate   # generate migration from schema
 pnpm --filter @izimvo/backend db:migrate    # apply to DATABASE_URL
-pnpm --filter @izimvo/backend db:seed       # seed one demo site + key
+pnpm --filter @izimvo/backend db:seed       # seed the Danetti site + key
 
 # run
 pnpm --filter @izimvo/backend dev           # http://localhost:8787
 ```
+
+## Storefront mode (Danetti)
+
+This deployment runs in **Storefront** mode, scoped to a single Shopify store
+(Danetti) via its own public `/api/mcp` endpoint — no JWT. Search, product
+detail, cart, and policy/FAQ answers all come from that one store.
+
+**Env** (set on the host / Railway; not in the repo):
+
+```
+CATALOG_MODE=storefront
+SHOPIFY_STORE_MCP_URL=https://www.danetti.com/api/mcp
+STORE_DISPLAY_NAME=Danetti
+STORE_DEFAULT_COUNTRY=GB          # drives ships-to + GBP when the LLM omits it
+```
+
+`pnpm db:seed` seeds the Danetti site (`pk_live_danetti`, `en-GB`, furniture
+categories). Reseeding an existing DB means dropping first — the seed is
+insert-only.
+
+**Speechify agent** — beyond the shared `search_products` tool, a storefront
+agent adds two HMAC-signed webhook tools. Each tool URL must carry
+`?cid={{system__conversation_id}}` so the backend can resolve the session
+server-side (the LLM never passes scope, cart id, or variant):
+
+| Tool | Endpoint | LLM params |
+|------|----------|-----------|
+| `search_products` | `POST /v1/tools/search-products?cid=…` | `query`, `max_price?`, `color?`, `ships_to?` |
+| `add_to_cart` | `POST /v1/tools/add-to-cart?cid=…` | `product_id`, `quantity?`, `options?` |
+| `product_info` | `POST /v1/tools/product-info?cid=…` | `product_id?`, `question?`, `options?` |
+
+`add_to_cart` resolves the purchasable variant from `product_id` (+ `options`
+for multi-variant items), builds the store cart across turns, and returns a real
+UTM-tagged Danetti checkout URL. `product_info` grounds answers in
+`get_product_details` + `search_shop_policies_and_faqs` (dimensions, materials,
+delivery, returns, warranty) so the adviser never invents facts.
+
+Prompt posture: a Danetti furniture adviser (en-GB / GBP) — opinionated, ≤3
+options spoken, confirms before checkout.
 
 ## Test & typecheck
 
@@ -83,6 +122,14 @@ pnpm typecheck
   `session_start` is recorded at mint and `tool_call` at search. Acks
   uncorrelated calls (200, `recorded:false`) to stop retries. Contract test:
   signed → usage keyed to the right session; unsigned → 401.
+- **Storefront (Danetti)** ✅ single-store mode over `www.danetti.com/api/mcp`:
+  `search_catalog` + native `get_product_details`, a real MCP-managed cart
+  (`add_to_cart` → `update_cart`/`get_cart`, cart id kept per conversation, real
+  UTM-tagged checkout URL), and grounded product Q&A (`product_info` →
+  `get_product_details` + `search_shop_policies_and_faqs`). Loader renders a cart
+  panel (poll `GET /v1/conversation-cart`) with a real checkout button (entry
+  still **4.4 KB gzip**, budget < 15 KB). Verified end-to-end against the live
+  Danetti MCP; contract tests for the cart client and both tool routes.
 - **Phase 6 — hardening** ⏳ remaining: Redis-backed rate limiting for
-  horizontal scale, loader versioned-core split, structured logs/request ids,
-  abuse/load testing.
+  horizontal scale (in-memory conversation cart/products lost on restart),
+  loader versioned-core split, structured logs/request ids, abuse/load testing.
