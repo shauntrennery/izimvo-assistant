@@ -15,11 +15,12 @@ async function main() {
   const [site] = await db
     .insert(sites)
     .values({
-      name: "Demo Outdoor Co",
+      name: "Danetti",
       status: "active",
-      catalogMode: "global",
-      defaultLocale: "en-ZA",
-      defaultCategorySlug: "trail-running",
+      catalogMode: "storefront",
+      merchantUrl: "https://www.danetti.com",
+      defaultLocale: "en-GB",
+      defaultCategorySlug: "furniture",
     })
     .returning({ id: sites.id });
 
@@ -27,28 +28,33 @@ async function main() {
 
   await db.insert(apiKeys).values({
     siteId,
-    publicKey: "pk_live_demo",
+    publicKey: "pk_live_danetti",
     allowedDomains: [
-      "shop.example.com",
-      "www.example.com",
       "localhost",
+      // the store itself, if the widget is embedded on the live site for testing
+      "www.danetti.com",
       // the hosted demo storefront runs on the backend's own origin
       "izimvo-backend-production.up.railway.app",
     ],
     rateLimitRpm: 60,
   });
 
-  // Demo categories. savedCatalogSlug null → unscoped global-catalog search
-  // (scoped only by the shopper's query); set a real Shopify saved-catalog slug
-  // to hard-bound a category to a curated catalog.
+  // Storefront categories. savedCatalogSlug null → the store's whole catalog,
+  // scoped only by the shopper's query (how the Storefront MCP search works).
   await db.insert(categories).values(
-    ["trail-running", "hiking-boots", "rain-shells", "backpacks", "sleeping-bags", "tents"].map(
-      (slug) => ({ siteId, slug, taxonomyId: null, savedCatalogSlug: null }),
-    ),
+    [
+      "furniture",
+      "dining-chairs",
+      "dining-tables",
+      "sofas",
+      "office-chairs",
+      "desks",
+      "bar-stools",
+    ].map((slug) => ({ siteId, slug, taxonomyId: null, savedCatalogSlug: null })),
   );
 
   // eslint-disable-next-line no-console
-  console.log(`Seeded site ${siteId} with key pk_live_demo`);
+  console.log(`Seeded site ${siteId} with key pk_live_danetti`);
   process.exit(0);
 }
 

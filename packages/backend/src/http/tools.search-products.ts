@@ -27,7 +27,6 @@ import type { AppDeps } from "./deps.js";
 const SIGNATURE_HEADER = "x-speechify-signature";
 const TIMESTAMP_HEADER = "x-speechify-timestamp";
 const TEST_HEADER = "x-speechify-webhook-test";
-const DEFAULT_SHIPS_TO = "ZA";
 const RESULT_LIMIT = 3;
 
 const CONVERSATION_HEADER = "x-speechify-conversation-id";
@@ -110,7 +109,7 @@ export function searchProductsRoutes(deps: AppDeps): Hono {
     // degrades to an empty result (the agent asks a clarifying question) rather
     // than a 500 the agent reads aloud as "the catalogue is down".
     const query = args.color ? `${args.color} ${args.query}` : args.query;
-    const shipsTo = args.ships_to ?? DEFAULT_SHIPS_TO;
+    const shipsTo = args.ships_to ?? deps.storeDefaultCountry;
     let results;
     try {
       results = await deps.catalog.search({

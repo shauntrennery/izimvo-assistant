@@ -80,6 +80,7 @@ const app = createApp({
   webhookHmacSecret: env.SPEECHIFY_WEBHOOK_HMAC_SECRET,
   toolHmacSecret: env.SPEECHIFY_TOOL_HMAC_SECRET,
   utmSource: env.ATTRIBUTION_UTM_SOURCE,
+  storeDefaultCountry: env.STORE_DEFAULT_COUNTRY,
   sessionIpRateLimitPerMin: 30,
   loaderBundle: readLoaderBundle(),
   demoHtml: readExampleHtml("host.html"),

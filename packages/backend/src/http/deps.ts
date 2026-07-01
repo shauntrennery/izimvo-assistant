@@ -18,6 +18,8 @@ export interface AppDeps {
   toolHmacSecret: string;
   /** ATTRIBUTION_UTM_SOURCE — stamped on every checkout URL. */
   utmSource: string;
+  /** Default ships-to country (ISO-2) when the LLM omits it; drives buyer currency. */
+  storeDefaultCountry: string;
   /** Per-IP burst ceiling for /v1/session, independent of per-key rpm. */
   sessionIpRateLimitPerMin: number;
   /** Built loader bundle to serve at /v1/loader.js; omitted in tests/when absent. */

@@ -35,6 +35,10 @@ const envSchema = z.object({
   // Optional display name for the single store (Storefront mode); shown as the
   // offer merchant on product results. Falls back to blank if unset.
   STORE_DISPLAY_NAME: z.string().optional(),
+  // Default ships-to country (ISO 3166-1 alpha-2) for this deployment. Drives the
+  // catalog ships-to filter and the buyer currency when the LLM omits ships_to.
+  // Defaults to ZA to preserve prior behavior; set GB for the Danetti store.
+  STORE_DEFAULT_COUNTRY: z.string().length(2).default("ZA"),
 
   DATABASE_URL: z.string().min(1),
 
