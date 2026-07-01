@@ -93,13 +93,16 @@ export function addToCartRoutes(deps: AppDeps): Hono {
       const summary = await deps.cart.addItems(cartId, [
         { variantId: detail.variantId, quantity },
       ]);
-      putConversationCart(conversationId, summary);
 
+      // UTM-tag the checkout URL server-side (§11.9) and store the TAGGED summary
+      // so the loader's /v1/conversation-cart poll and /v1/checkout both see it.
       const { url: checkoutUrl } = tagCheckoutUrl(summary.checkoutUrl, {
         source: deps.utmSource,
         categorySlug: scope.categorySlug,
         sessionId: scope.sessionId,
       });
+      const tagged = { ...summary, checkoutUrl };
+      putConversationCart(conversationId, tagged);
 
       void deps.repo
         .recordUsageEvent({
@@ -114,7 +117,7 @@ export function addToCartRoutes(deps: AppDeps): Hono {
         })
         .catch(() => undefined);
 
-      return c.json({ ok: true, cart: { ...summary, checkoutUrl } });
+      return c.json({ ok: true, cart: tagged });
     } catch {
       // Degrade to a spoken-friendly failure rather than a 500 the agent reads
       // aloud as an outage.

@@ -1,5 +1,6 @@
 import { parseConfig } from "./attributes.js";
 import { createCart, type Cart } from "./cart.js";
+import { createCartPoller, type CartPoller } from "./cartPoll.js";
 import { createCheckoutReporter, type CheckoutReporter } from "./checkout.js";
 import { createAudioGate, type AudioGate } from "./mic.js";
 import { createProductPoller, type ProductPoller } from "./products.js";
@@ -40,6 +41,7 @@ export interface BootDeps {
 export function boot(deps: BootDeps): void {
   let handle: AgentHandle | null = null;
   let poller: ProductPoller | null = null;
+  let cartPoller: CartPoller | null = null;
   let connecting = false;
 
   function teardown(): void {
@@ -47,6 +49,8 @@ export function boot(deps: BootDeps): void {
     deps.cart.clear();
     poller?.stop();
     poller = null;
+    cartPoller?.stop();
+    cartPoller = null;
     handle = null;
     connecting = false;
   }
@@ -104,8 +108,8 @@ export function boot(deps: BootDeps): void {
         checkout: deps.checkout,
       });
 
-      // Render cards by polling backend search results — independent of the
-      // agent calling render_products.
+      // Render cards + cart by polling backend state — independent of the agent
+      // calling render_products / a cart client tool.
       if (session.conversationId) {
         poller = createProductPoller({
           apiBase: deps.apiBase,
@@ -117,6 +121,27 @@ export function boot(deps: BootDeps): void {
           },
         });
         poller.start();
+
+        cartPoller = createCartPoller({
+          apiBase: deps.apiBase,
+          conversationId: session.conversationId,
+          fetchImpl: deps.fetchImpl,
+          onCart: (cart) => {
+            // Map the cart's (UTM-tagged) checkout URL to a upid so a checkout
+            // click is attributed, then render the cart.
+            deps.checkout.index([
+              {
+                upid: cart.lines[0]?.productId ?? cart.cartId,
+                title: "",
+                priceMinor: cart.subtotalMinor,
+                currency: cart.currency,
+                checkoutUrl: cart.checkoutUrl,
+              },
+            ]);
+            deps.widget.showCart(cart);
+          },
+        });
+        cartPoller.start();
       }
     } catch {
       deps.widget.setStatus("error");
